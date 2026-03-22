@@ -6,6 +6,16 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig({
   plugins: [
     react(),
-    tailwindcss()
+    tailwindcss(),
+    {
+      name: 'copy-redirects',
+      generateBundle() {
+        this.emitFile({
+          type: 'asset',
+          fileName: '_redirects',
+          source: '/* /index.html 200'
+        })
+      }
+    }
   ],
 })
