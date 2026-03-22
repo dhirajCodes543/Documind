@@ -45,5 +45,7 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             cd ~/documind/backend
+            docker-compose stop backend || true
+            docker-compose rm -f backend || true
             docker-compose pull backend
             docker-compose up -d backend
