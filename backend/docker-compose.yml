@@ -13,7 +13,7 @@ services:
       - documind_postgres_data:/var/lib/postgresql/data
 
   backend:
-    build: .
+    image: dhirajcodes123/documind-backend:latest
     container_name: documind-backend
     restart: always
     depends_on:
