@@ -12,7 +12,7 @@ export function useMessages() {
       setMessages(
         data.messages.map((m) => ({ role: m.role, text: m.content, id: m.id }))
       );
-    } catch {
+    } catch (err) {
       setSendError("Could not load previous messages.");
     }
   };
@@ -37,7 +37,9 @@ export function useMessages() {
         { role: "assistant", text: data.reply, id: Date.now() },
       ]);
     } catch (err) {
-      setSendError(err.response?.data?.error || "Failed to get a response. Try again.");
+      setSendError(
+        err.response?.data?.error || "Failed to get a response. Try again."
+      );
       setMessages((prev) => prev.filter((m) => m.id !== userMsg.id));
       setInput(sentInput);
     } finally {
@@ -48,5 +50,15 @@ export function useMessages() {
   const appendMessage = (msg) => setMessages((prev) => [...prev, msg]);
   const clearMessages = () => setMessages([]);
 
-  return { messages, isTyping, sendError, setSendError, sendMessage, loadMessages, appendMessage, clearMessages };
+  return {
+    messages,
+    isTyping,
+    sendError,
+    setSendError,
+    sendMessage,
+    loadMessages,
+    appendMessage,
+    clearMessages,
+    setMessages, // ✅ exported so Chat.jsx can set messages directly
+  };
 }

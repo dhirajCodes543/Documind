@@ -11,6 +11,7 @@ import Topbar from "../Components/Topbar";
 import MessageList from "../Components/MessageList";
 import InputBar from "../Components/InputBar";
 import UploadGate from "../Components/UploadGate";
+import api from "../Api";
 
 export default function Chat() {
   const { user, logout } = useAuth();
@@ -44,6 +45,7 @@ export default function Chat() {
     loadMessages,
     appendMessage,
     clearMessages,
+    setMessages,
   } = useMessages();
 
   const {
@@ -179,7 +181,15 @@ export default function Chat() {
 
   // ── Load chat from URL param ───────────────────────────────────────────
   useEffect(() => {
-    if (!urlChatId) return;
+    if (!urlChatId) {
+      // No chatId in URL — reset everything
+      setPdf(null);
+      resetPdfs([]);
+      clearMessages();
+      setActiveChatId(null);
+      return;
+    }
+
     if (urlChatId === activeChatId) return;
     if (historyLoading) return;
 
@@ -204,7 +214,27 @@ export default function Chat() {
       );
     }
 
-    loadMessages(urlChatId);
+    // ✅ Load messages inline — handle 404 properly
+    api
+      .get(`/api/chat/${urlChatId}/messages`)
+      .then(({ data }) => {
+        setMessages(
+          data.messages.map((m) => ({ role: m.role, text: m.content, id: m.id }))
+        );
+      })
+      .catch((err) => {
+        if (err.response?.status === 404) {
+          // Chat no longer exists — reset to clean state
+          setPdf(null);
+          resetPdfs([]);
+          clearMessages();
+          setActiveChatId(null);
+          setSendError("");
+          navigate("/chat", { replace: true });
+        } else {
+          setSendError("Could not load previous messages.");
+        }
+      });
   }, [urlChatId, chatHistory, historyLoading]);
 
   // ── New chat ───────────────────────────────────────────────────────────
@@ -221,7 +251,7 @@ export default function Chat() {
     setShowYoutubeInput(false);
     setShowWebsiteInput(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
-    navigate("/chat");
+    navigate("/chat", { replace: true }); // ✅ replace so back button doesn't go to deleted chat
   };
 
   const handleLogout = async () => {
@@ -318,7 +348,7 @@ export default function Chat() {
         />
       </div>
 
-      {/* ── YouTube URL modal ────────────────────────────────────────── */}
+      {/* ── YouTube URL modal ──────────────────────────────────────── */}
       {showYoutubeInput && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="bg-zinc-900 border border-zinc-700 rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl">
@@ -366,7 +396,7 @@ export default function Chat() {
         </div>
       )}
 
-      {/* ── Website URL modal ────────────────────────────────────────── */}
+      {/* ── Website URL modal ──────────────────────────────────────── */}
       {showWebsiteInput && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="bg-zinc-900 border border-zinc-700 rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl">
