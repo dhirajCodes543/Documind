@@ -2,13 +2,37 @@
 
 DocuMind uses **Docker, Docker Compose, GitHub Actions, AWS EC2, Nginx, and SSL/TLS** to build, deploy, and run the backend automatically while keeping the database and uploaded files persistent.
 
-🔗 **Public API Endpoint**
+## Live Application
 
+🌐 **Frontend (Netlify)**  
+https://1documind.netlify.app
+
+🔗 **Backend API (AWS EC2 + Nginx + SSL)**  
 https://api.mindchuk.co.in/
 
 ---
 
-# 1. System Overview
+# System Architecture
+
+```
+User
+  ↓
+Frontend (Netlify)
+https://1documind.netlify.app
+  ↓
+Backend API
+https://api.mindchuk.co.in
+  ↓
+Nginx Reverse Proxy
+  ↓
+Backend Docker Container (Node.js)
+  ↓
+PostgreSQL Container (pgvector)
+```
+
+---
+
+# Backend Deployment Infrastructure
 
 The backend runs on an **AWS EC2 server** using Docker containers.
 
@@ -32,7 +56,7 @@ EC2 SERVER
 
 ---
 
-# 2. Docker Containers
+# Docker Containers
 
 The system uses **Docker Compose** to manage two containers.
 
@@ -48,20 +72,15 @@ Purpose:
 
 - Stores application data
 - Stores document chunks and embeddings
-- Enables **vector search using pgvector**
+- Enables **vector similarity search using pgvector**
 
-Features:
-
-- Uses a **Docker volume** for persistence
-- Automatically restarts if the server restarts
-
-Database files are stored in:
+Database files persist inside Docker volume:
 
 ```
 documind_postgres_data
 ```
 
-Inside container:
+Container path:
 
 ```
 /var/lib/postgresql/data
@@ -77,14 +96,14 @@ Image:
 dhirajcodes123/documind-backend:latest
 ```
 
-Built using the project **Dockerfile** and pushed to **DockerHub** through GitHub Actions.
+Built from the project **Dockerfile** and pushed to **DockerHub** through GitHub Actions.
 
 Responsibilities:
 
 - Node.js API server
-- Authentication and JWT handling
+- Authentication & JWT
 - PDF upload processing
-- Chunk generation
+- Text chunk generation
 - Embedding generation
 - Communication with PostgreSQL
 
@@ -96,7 +115,7 @@ Internal backend port:
 
 ---
 
-# 3. File Upload Persistence
+# File Upload Persistence
 
 Uploaded PDFs are stored using a **bind mount**.
 
@@ -110,15 +129,15 @@ Meaning:
 
 ```
 EC2 HOST                       CONTAINER
-~/documind/backend/uploads  →  /app/uploads
+~/documind/backend/uploads →  /app/uploads
 ```
 
 Therefore:
 
-- Files uploaded by users are stored directly on the EC2 filesystem
-- Restarting or redeploying containers **does not delete uploaded files**
+- Uploaded files remain stored on the EC2 filesystem
+- Container redeployments **do not delete user files**
 
-Actual location on server:
+Server location:
 
 ```
 ~/documind/backend/uploads
@@ -126,29 +145,11 @@ Actual location on server:
 
 ---
 
-# 4. Database Persistence
+# GitHub Actions CI/CD Pipeline
 
-PostgreSQL data is stored using a **Docker volume**.
+DocuMind uses **GitHub Actions** to automatically deploy the backend.
 
-Configuration:
-
-```
-documind_postgres_data:/var/lib/postgresql/data
-```
-
-This ensures:
-
-- Database data survives container restarts
-- Database data survives container recreation
-- Data remains safe during deployments
-
----
-
-# 5. GitHub Actions CI/CD Pipeline
-
-DocuMind uses **GitHub Actions** to automate backend deployments.
-
-Workflow:
+Deployment flow:
 
 ```
 Push Code
@@ -164,7 +165,7 @@ Pull latest image
 Restart backend container
 ```
 
-Deployment commands executed on EC2:
+Commands executed on EC2:
 
 ```
 docker-compose stop backend
@@ -176,13 +177,13 @@ docker-compose up -d backend
 
 Result:
 
-- Backend container is replaced with the newest version
-- PostgreSQL container remains running
-- Uploaded files remain intact
+- Backend container updates automatically
+- PostgreSQL container keeps running
+- Uploaded files remain safe
 
 ---
 
-# 6. Backend Startup Process
+# Backend Startup Process
 
 When the backend container starts it runs:
 
@@ -190,111 +191,20 @@ When the backend container starts it runs:
 npx prisma migrate deploy && npm start
 ```
 
-Steps:
+Startup steps:
 
-1. Prisma applies pending migrations
-2. Node.js server starts
-3. Backend connects to PostgreSQL
-4. API becomes available on port **5000**
-
----
-
-# 7. Domain + Nginx Reverse Proxy
-
-The backend is exposed through **Nginx as a reverse proxy**.
-
-Architecture flow:
+1. Apply pending Prisma migrations
+2. Start Node.js server
+3. Connect to PostgreSQL
+4. API becomes available through Nginx at
 
 ```
-Client
-   ↓
 https://api.mindchuk.co.in
-   ↓
-Nginx Reverse Proxy
-   ↓
-http://localhost:5000
-   ↓
-DocuMind Backend Container
-```
-
-Nginx responsibilities:
-
-- Accept incoming HTTP/HTTPS traffic
-- Handle SSL termination
-- Forward requests to the backend container
-- Hide internal ports from public internet
-
----
-
-# 8. SSL / TLS Security
-
-The API is secured using **SSL/TLS certificates**.
-
-Secure endpoint:
-
-```
-https://api.mindchuk.co.in/
-```
-
-Example request:
-
-```
-https://api.mindchuk.co.in/api/endpoint
-```
-
-Benefits:
-
-- Encrypted communication
-- Secure API requests
-- Production-ready HTTPS setup
-
----
-
-# 9. Deployment Flow
-
-```
-Developer pushes code
-        ↓
-GitHub Actions builds Docker image
-        ↓
-Image pushed to DockerHub
-        ↓
-EC2 pulls latest backend image
-        ↓
-Old backend container removed
-        ↓
-New backend container started
-        ↓
-Backend reconnects to existing PostgreSQL
-        ↓
-API available at https://api.mindchuk.co.in
 ```
 
 ---
 
-# 10. Persistence Summary
-
-Persisted components:
-
-```
-Database → Docker Volume
-Uploads → EC2 filesystem
-```
-
-Non-persisted components:
-
-```
-Backend container
-Old Docker images
-```
-
-Containers can be recreated anytime **without losing user data**.
-
----
-
-# 11. Advantages of This Setup
-
-This architecture provides:
+# Advantages of This Architecture
 
 - Automated deployments (CI/CD)
 - Persistent database storage
@@ -302,7 +212,5 @@ This architecture provides:
 - Containerized backend
 - Secure HTTPS API
 - Domain-based access via Nginx
-- Reproducible infrastructure
-- Safe deployments without downtime
-
-This setup follows a **production-style architecture used in real backend systems**.
+- Easy reproducibility
+- Production-style deployment architecture
