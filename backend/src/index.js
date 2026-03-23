@@ -5,6 +5,8 @@ require("dotenv").config();
 const cookieParser = require("cookie-parser");
 const http = require("http");
 const authMiddleware = require("./middlewares/authmiddleware.js");
+const path = require('path')
+const fs = require('fs')
 
 
 const PORT = 5000;
