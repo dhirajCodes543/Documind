@@ -27,8 +27,13 @@ export default function Chat() {
 
   const fileInputRef = useRef(null);
 
-  const { chatHistory, historyLoading, prependChat, setChatHistory, removeChat } =
-    useChatHistory();
+  const {
+    chatHistory,
+    historyLoading,
+    prependChat,
+    setChatHistory,
+    removeChat,
+  } = useChatHistory();
 
   const {
     messages,
@@ -75,12 +80,7 @@ export default function Chat() {
       resetPdfs((prev) =>
         prev.map((p) =>
           p.id === tempId
-            ? {
-              id: data.documentId,
-              name: data.filename,
-              uploading: false,
-              isYoutube: true,
-            }
+            ? { id: data.documentId, name: data.filename, uploading: false, isYoutube: true }
             : p
         )
       );
@@ -105,12 +105,7 @@ export default function Chat() {
       const tempId = `temp-web-${Date.now()}`;
       resetPdfs((prev) => [
         ...prev,
-        {
-          id: tempId,
-          name: "Crawling website…",
-          uploading: true,
-          isWebsite: true,
-        },
+        { id: tempId, name: "Crawling website…", uploading: true, isWebsite: true },
       ]);
       return tempId;
     },
@@ -119,11 +114,11 @@ export default function Chat() {
         prev.map((p) =>
           p.id === tempId
             ? {
-              id: data.documentId,
-              name: `${data.filename} (${data.pagesScraped} pages)`,
-              uploading: false,
-              isWebsite: true,
-            }
+                id: data.documentId,
+                name: `${data.filename} (${data.pagesScraped} pages)`,
+                uploading: false,
+                isWebsite: true,
+              }
             : p
         )
       );
@@ -142,12 +137,7 @@ export default function Chat() {
         title: data.filename,
         createdAt: new Date().toISOString(),
         documents: [
-          {
-            id: data.documentId,
-            filename: data.filename,
-            isYoutube,
-            isWebsite,
-          },
+          { id: data.documentId, filename: data.filename, isYoutube, isWebsite },
         ],
       });
     } else {
@@ -155,17 +145,12 @@ export default function Chat() {
         prev.map((c) =>
           c.id === data.chatId
             ? {
-              ...c,
-              documents: [
-                ...(c.documents ?? []),
-                {
-                  id: data.documentId,
-                  filename: data.filename,
-                  isYoutube,
-                  isWebsite,
-                },
-              ],
-            }
+                ...c,
+                documents: [
+                  ...(c.documents ?? []),
+                  { id: data.documentId, filename: data.filename, isYoutube, isWebsite },
+                ],
+              }
             : c
         )
       );
@@ -181,13 +166,13 @@ export default function Chat() {
           ? isYoutube
             ? `🎬 I've loaded the transcript for **${data.filename}**. Ask me anything about it!`
             : isWebsite
-              ? `🌐 I've crawled **${data.pagesScraped} pages** from **${data.filename}**. Ask me anything about the site!`
-              : `📄 I've loaded **${data.filename}**. Ask me anything about it!`
+            ? `🌐 I've crawled **${data.pagesScraped} pages** from **${data.filename}**. Ask me anything about the site!`
+            : `📄 I've loaded **${data.filename}**. Ask me anything about it!`
           : isYoutube
-            ? `🎬 Also loaded **${data.filename}**. Feel free to ask about any of your sources!`
-            : isWebsite
-              ? `🌐 Also crawled **${data.pagesScraped} pages** from **${data.filename}**!`
-              : `📄 Also loaded **${data.filename}**. Feel free to ask about any of your sources!`,
+          ? `🎬 Also loaded **${data.filename}**. Feel free to ask about any of your sources!`
+          : isWebsite
+          ? `🌐 Also crawled **${data.pagesScraped} pages** from **${data.filename}**!`
+          : `📄 Also loaded **${data.filename}**. Feel free to ask about any of your sources!`,
       id: Date.now(),
     });
   };
@@ -270,7 +255,7 @@ export default function Chat() {
         user={user}
         onNewChat={startNewChat}
         onLogout={handleLogout}
-        onDeleteChat={removeChat} // ✅
+        onDeleteChat={removeChat}
       />
 
       <div className="flex-1 flex flex-col min-w-0">
@@ -292,10 +277,7 @@ export default function Chat() {
                 setDragOver(false);
                 handlePdfSelect(e.dataTransfer.files[0]);
               }}
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDragOver(true);
-              }}
+              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
               onDragLeave={() => setDragOver(false)}
               onClick={() => !uploading && fileInputRef.current?.click()}
               youtubeUrl={youtubeUrl}
@@ -311,11 +293,7 @@ export default function Chat() {
               websiteProgress={websiteProgress}
             />
           ) : (
-            <MessageList
-              messages={messages}
-              isTyping={isTyping}
-              user={user}
-            />
+            <MessageList messages={messages} isTyping={isTyping} user={user} />
           )}
         </div>
 
@@ -335,11 +313,7 @@ export default function Chat() {
             if (userText)
               appendMessage({ role: "user", text: userText, id: Date.now() });
             if (assistantText)
-              appendMessage({
-                role: "assistant",
-                text: assistantText,
-                id: Date.now() + 1,
-              });
+              appendMessage({ role: "assistant", text: assistantText, id: Date.now() + 1 });
           }}
         />
       </div>
@@ -400,7 +374,7 @@ export default function Chat() {
               <span className="text-emerald-400">🌐</span> Crawl a Website
             </h3>
             <p className="text-zinc-500 text-xs mb-4">
-              We'll crawl up to 10 pages within the same subdirectory
+              We'll scrape the page and let you chat with its content
             </p>
             <div className="flex gap-2">
               <input
@@ -415,7 +389,7 @@ export default function Chat() {
                   }
                   if (e.key === "Escape") setShowWebsiteInput(false);
                 }}
-                placeholder="https://docs.python.org/3/tutorial/"
+                placeholder="https://example.com/article"
                 disabled={websiteLoading}
                 className="flex-1 bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500/70 transition"
               />
@@ -427,7 +401,7 @@ export default function Chat() {
                 disabled={websiteLoading || !websiteUrl.trim()}
                 className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 disabled:text-zinc-500 text-white text-sm font-medium transition cursor-pointer"
               >
-                {websiteLoading ? "…" : "Crawl"}
+                {websiteLoading ? "…" : "Go"}
               </button>
             </div>
             {websiteError && (

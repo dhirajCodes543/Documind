@@ -36,14 +36,13 @@ export default function Sidebar({
   user,
   onNewChat,
   onLogout,
-  onDeleteChat, // ✅ new prop
+  onDeleteChat,
 }) {
   const navigate = useNavigate();
   const [deletingId, setDeletingId] = useState(null);
-  const [hoveredId, setHoveredId] = useState(null);
 
   const handleDelete = async (e, chatId) => {
-    e.stopPropagation(); // prevent navigating to chat
+    e.stopPropagation();
     const confirmed = window.confirm(
       "Delete this chat? This will permanently remove all messages and uploaded documents."
     );
@@ -52,11 +51,11 @@ export default function Sidebar({
     setDeletingId(chatId);
     try {
       await api.delete(`/api/chat/${chatId}`);
-      onDeleteChat(chatId); // remove from local state
+      onDeleteChat(chatId);
 
-      // If deleting the active chat — go to /chat
+      // ✅ If deleting active chat — reset everything
       if (activeChatId === chatId) {
-        navigate("/chat");
+        onNewChat();
       }
     } catch (err) {
       console.error("Failed to delete chat:", err);
@@ -68,8 +67,9 @@ export default function Sidebar({
 
   return (
     <aside
-      className={`${sidebarOpen ? "w-72" : "w-0"
-        } shrink-0 transition-all duration-300 overflow-hidden flex flex-col bg-zinc-900 border-r border-zinc-800`}
+      className={`${
+        sidebarOpen ? "w-72" : "w-0"
+      } shrink-0 transition-all duration-300 overflow-hidden flex flex-col bg-zinc-900 border-r border-zinc-800`}
     >
       {/* Header */}
       <div className="flex items-center justify-between px-4 pt-5 pb-4 border-b border-zinc-800">
@@ -118,17 +118,21 @@ export default function Sidebar({
             return (
               <div
                 key={chat.id}
-                className={`flex items-center gap-1 rounded-lg transition ${activeChatId === chat.id
+                className={`flex items-center gap-1 rounded-lg transition ${
+                  activeChatId === chat.id
                     ? "bg-zinc-800"
                     : "hover:bg-zinc-800/60"
-                  }`}
+                }`}
               >
                 {/* Chat button */}
                 <button
                   onClick={() => navigate(`/chat/${chat.id}`)}
                   disabled={isDeleting}
-                  className={`flex-1 text-left px-3 py-2.5 cursor-pointer min-w-0 ${activeChatId === chat.id ? "text-white" : "text-zinc-400 hover:text-white"
-                    } ${isDeleting ? "opacity-50" : ""}`}
+                  className={`flex-1 text-left px-3 py-2.5 cursor-pointer min-w-0 rounded-lg ${
+                    activeChatId === chat.id
+                      ? "text-white"
+                      : "text-zinc-400 hover:text-white"
+                  } ${isDeleting ? "opacity-50" : ""}`}
                 >
                   <div className="flex items-center gap-1.5">
                     {isDeleting ? (
@@ -147,7 +151,7 @@ export default function Sidebar({
                   </p>
                 </button>
 
-                {/* ✅ Delete button — always visible for ALL chats */}
+                {/* ✅ Delete button — always visible */}
                 {!isDeleting ? (
                   <button
                     onClick={(e) => handleDelete(e, chat.id)}
@@ -157,7 +161,7 @@ export default function Sidebar({
                     <TrashIcon className="w-3.5 h-3.5" />
                   </button>
                 ) : (
-                  <div className="w-6 mr-1" /> // spacer while deleting
+                  <div className="w-6 mr-1" />
                 )}
               </div>
             );
