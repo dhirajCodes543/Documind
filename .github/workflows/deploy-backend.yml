@@ -45,7 +45,12 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             cd ~/documind/backend
+
             docker-compose stop backend || true
             docker-compose rm -f backend || true
+
+            # Clean old docker images to prevent disk full
+            docker system prune -af
+
             docker-compose pull backend
             docker-compose up -d backend
