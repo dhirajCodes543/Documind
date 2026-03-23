@@ -9,7 +9,7 @@ export default function PdfViewerModal({ doc, onClose }) {
     return () => window.removeEventListener("keydown", handler);
   }, [onClose]);
 
-  const pdfUrl = `http://localhost:5000/api/document/${doc.id}/view`;
+  const pdfUrl = `https://api.mindchuk.co.in/api/document/${doc.id}/view`;
 
   return (
     <div
