@@ -9,6 +9,12 @@ const authMiddleware = require("./middlewares/authmiddleware.js");
 
 const PORT = 5000;
 const app = express();
+app.set("trust proxy", 1);
+
+const uploadDir = path.join(__dirname, "../uploads");
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
 
 app.use(cors({ origin: "https://1documind.netlify.app", credentials: true }));
 app.use(cookieParser());
