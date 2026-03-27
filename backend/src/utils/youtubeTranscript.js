@@ -69,7 +69,7 @@ async function getYoutubeTranscript(url) {
     }
   );
 
-  console.log("RapidAPI raw response:", res.slice(0, 300));
+  // console.log("RapidAPI raw response:", res.slice(0, 300));
 
   let data;
   try {
@@ -78,8 +78,8 @@ async function getYoutubeTranscript(url) {
     throw new Error("Invalid response from transcript API.");
   }
 
-  console.log("RapidAPI status:", data?.status);
-  console.log("RapidAPI keys:", Object.keys(data ?? {}));
+  // console.log("RapidAPI status:", data?.status);
+  // console.log("RapidAPI keys:", Object.keys(data ?? {}));
 
   if (data?.status === 429) {
     throw new Error("Monthly transcript quota exceeded. Try again next month.");
