@@ -10,7 +10,7 @@ import {
 import ReactMarkdown from "react-markdown";
 import api from "../Api";
 
-// ── Markdown renderer ──────────────────────────────────────────────────────
+// ── Markdown renderer (unchanged) ──────────────────────────────────────────
 const mdComponents = {
   p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
   strong: ({ children }) => (
@@ -61,7 +61,10 @@ function formatPubDate(dateStr) {
 }
 
 // ── Article card ───────────────────────────────────────────────────────────
-function ArticleCard({ article, index, onSummarize, summarizing }) {
+function ArticleCard({ article, index }) {
+  // Summarize is disabled for now
+  const isDisabled = true;
+
   return (
     <div className="group relative rounded-2xl border border-zinc-800 bg-zinc-900/90 p-3 hover:border-zinc-700 transition-all duration-200 shadow-md">
       <div className="flex gap-3">
@@ -110,12 +113,12 @@ function ArticleCard({ article, index, onSummarize, summarizing }) {
           )}
 
           <button
-            onClick={() => onSummarize(article)}
-            disabled={summarizing}
-            className="mt-3 inline-flex items-center gap-1.5 rounded-xl border border-indigo-500/30 bg-indigo-500/10 px-3 py-1.5 text-xs font-medium text-indigo-300 hover:bg-indigo-500/20 hover:border-indigo-400/50 active:scale-95 active:bg-indigo-500/30 transition-all duration-150 disabled:opacity-50 disabled:scale-100"
+            disabled={isDisabled}
+            className="mt-3 inline-flex items-center gap-1.5 rounded-xl border border-zinc-600 bg-zinc-800/50 px-3 py-1.5 text-xs font-medium text-zinc-500 cursor-not-allowed transition-all duration-150"
+            title="Summarization feature coming soon"
           >
             <SparklesIcon className="w-3.5 h-3.5" />
-            {summarizing ? "Summarizing…" : "Summarize"}
+            Summarize (coming soon)
           </button>
         </div>
       </div>
@@ -123,7 +126,7 @@ function ArticleCard({ article, index, onSummarize, summarizing }) {
   );
 }
 
-// ── Summary panel ──────────────────────────────────────────────────────────
+// ── Summary panel (kept but won't be used until feature is enabled) ────────
 function SummaryPanel({ summary, article, onClose }) {
   return (
     <div className="bg-zinc-900/95 border border-indigo-500/25 rounded-2xl p-4">
@@ -132,15 +135,11 @@ function SummaryPanel({ summary, article, onClose }) {
           <div className="w-6 h-6 rounded-full bg-indigo-600 flex items-center justify-center text-sm font-bold shrink-0">
             <SparklesIcon className="w-3.5 h-3.5 text-white" />
           </div>
-
           <div className="min-w-0">
-            <p className="text-[10px] uppercase tracking-wider text-zinc-500">
-              Summary
-            </p>
+            <p className="text-[10px] uppercase tracking-wider text-zinc-500">Summary</p>
             <p className="text-xs text-zinc-300 truncate">{article?.title}</p>
           </div>
         </div>
-
         <button
           onClick={onClose}
           className="text-zinc-500 hover:text-zinc-200 active:scale-95 active:text-zinc-100 transition-all duration-150 shrink-0"
@@ -148,7 +147,6 @@ function SummaryPanel({ summary, article, onClose }) {
           <XMarkIcon className="w-4 h-4" />
         </button>
       </div>
-
       <div className="text-xs text-zinc-200 leading-6">
         <ReactMarkdown components={mdComponents}>{summary}</ReactMarkdown>
       </div>
@@ -156,7 +154,7 @@ function SummaryPanel({ summary, article, onClose }) {
   );
 }
 
-// ── Main component with sidebar ───────────────────────────────────────────
+// ── Main component with sidebar (summarization disabled) ───────────────────
 export default function LatestNews({ onClose }) {
   const [topic, setTopic] = useState("");
   const [newsData, setNewsData] = useState(null);
@@ -164,8 +162,9 @@ export default function LatestNews({ onClose }) {
   const [error, setError] = useState("");
 
   const [newTopicInput, setNewTopicInput] = useState("");
-  const [articleIdInput, setArticleIdInput] = useState(""); // changed from summarizeInput
+  const [selectedArticleId, setSelectedArticleId] = useState(""); // dropdown selection
 
+  // Summary state – kept but won't be triggered
   const [summary, setSummary] = useState(null);
   const [summaryArticle, setSummaryArticle] = useState(null);
   const [summarizing, setSummarizing] = useState(false);
@@ -192,7 +191,7 @@ export default function LatestNews({ onClose }) {
         setNewsData(data.data);
         setTopic(cleanedTopic);
         setNewTopicInput("");
-        setArticleIdInput("");
+        setSelectedArticleId(data.data.articles?.[0]?.id?.toString() || "");
 
         requestAnimationFrame(() => {
           if (overlayScrollRef.current) {
@@ -211,53 +210,16 @@ export default function LatestNews({ onClose }) {
     }
   };
 
+  // Summarization functions are kept but won't be called (buttons disabled)
+  // They will be enabled later when the feature is built
   const summarizeArticle = async (article) => {
-    setSummarizing(true);
-    setSummary(null);
-    setSummaryArticle(article);
-    setSummaryError("");
-
-    try {
-      const { data } = await api.post("/api/news/summarize", {
-        // Send the article ID as the main identifier (backend may use it)
-        articleId: article.id,
-        // Keep existing fields for backward compatibility
-        headline: article.title,
-        link: article.link,
-        contentSnippet: article.contentSnippet,
-      });
-
-      if (data.success) {
-        setSummary(data.summary);
-      } else {
-        setSummaryError(data.message || "Failed to summarize.");
-      }
-    } catch (err) {
-      setSummaryError(
-        err.response?.data?.message || "Failed to summarize. Please try again."
-      );
-    } finally {
-      setSummarizing(false);
-    }
+    // placeholder – not used now
+    console.log("Summarize called for", article);
   };
 
-  // New function to summarize by article ID
   const summarizeById = async (id) => {
-    if (!newsData) {
-      setSummaryError("No news loaded. Please search for a topic first.");
-      return;
-    }
-    const numericId = Number(id);
-    if (isNaN(numericId)) {
-      setSummaryError("Invalid article ID. Please enter a number.");
-      return;
-    }
-    const article = newsData.articles.find((a) => a.id === numericId);
-    if (article) {
-      await summarizeArticle(article);
-    } else {
-      setSummaryError(`Article with ID ${numericId} not found.`);
-    }
+    // placeholder – not used now
+    console.log("Summarize by ID", id);
   };
 
   const resetToSearch = () => {
@@ -267,8 +229,13 @@ export default function LatestNews({ onClose }) {
     setSummaryArticle(null);
     setError("");
     setSummaryError("");
-    setArticleIdInput("");
+    setSelectedArticleId("");
     setNewTopicInput("");
+  };
+
+  const truncateTitle = (title, maxLen = 50) => {
+    if (title.length <= maxLen) return title;
+    return title.slice(0, maxLen) + "…";
   };
 
   return (
@@ -309,7 +276,7 @@ export default function LatestNews({ onClose }) {
                   What would you like to do?
                 </p>
 
-                {/* Summarize section - now uses article ID */}
+                {/* Summarize section with dropdown – fully disabled */}
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <div className="w-6 h-6 rounded-full bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center shrink-0">
@@ -318,47 +285,33 @@ export default function LatestNews({ onClose }) {
                     <span className="text-sm text-zinc-300">Summarize an article by ID</span>
                   </div>
                   <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={articleIdInput}
-                      onChange={(e) => setArticleIdInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && articleIdInput.trim() && !summarizing && newsData) {
-                          summarizeById(articleIdInput.trim());
-                          setArticleIdInput("");
-                        }
-                      }}
-                      placeholder="Article ID (e.g., 1, 2, 3...)"
-                      disabled={summarizing || !newsData}
-                      className="flex-1 h-9 bg-zinc-900 border border-zinc-700 rounded-lg px-3 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-indigo-500/50 disabled:opacity-50"
-                    />
-                    <button
-                      onClick={() => {
-                        if (articleIdInput.trim() && newsData) {
-                          summarizeById(articleIdInput.trim());
-                          setArticleIdInput("");
-                        }
-                      }}
-                      disabled={!articleIdInput.trim() || summarizing || !newsData}
-                      className={`h-9 px-4 rounded-lg text-xs font-medium transition-all duration-150 active:scale-95 ${
-                        !articleIdInput.trim() || summarizing || !newsData
-                          ? "bg-zinc-700 text-zinc-500 cursor-not-allowed"
-                          : "bg-indigo-600/80 hover:bg-indigo-600 text-white"
-                      }`}
+                    <select
+                      value={selectedArticleId}
+                      onChange={(e) => setSelectedArticleId(e.target.value)}
+                      disabled={true} // permanently disabled
+                      className="flex-1 h-9 bg-zinc-900 border border-zinc-700 rounded-lg px-3 text-sm text-white opacity-50 cursor-not-allowed"
                     >
-                      {summarizing ? "..." : "Summarize"}
+                      {!newsData ? (
+                        <option>No articles loaded</option>
+                      ) : (
+                        newsData.articles.map((article) => (
+                          <option key={article.id} value={article.id}>
+                            ID: {article.id} - {truncateTitle(article.title)}
+                          </option>
+                        ))
+                      )}
+                    </select>
+                    <button
+                      disabled={true}
+                      className="h-9 px-4 rounded-lg text-xs font-medium bg-zinc-700 text-zinc-500 cursor-not-allowed"
+                      title="Summarization feature coming soon"
+                    >
+                      Summarize (soon)
                     </button>
                   </div>
-                  {!newsData && (
-                    <p className="text-[10px] text-zinc-500 mt-1">
-                      Search for a topic first to enable summarization.
-                    </p>
-                  )}
-                  {newsData && (
-                    <p className="text-[10px] text-zinc-500 mt-1">
-                      Available IDs: {newsData.articles.map(a => a.id).join(', ')}
-                    </p>
-                  )}
+                  <p className="text-[10px] text-zinc-500 mt-1">
+                    Summarization will be available soon.
+                  </p>
                 </div>
 
                 <div className="my-4 flex items-center gap-3">
@@ -367,7 +320,7 @@ export default function LatestNews({ onClose }) {
                   <div className="flex-1 h-px bg-zinc-800" />
                 </div>
 
-                {/* New search section */}
+                {/* New search section – fully functional */}
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <div className="w-6 h-6 rounded-full bg-emerald-600/20 border border-emerald-500/30 flex items-center justify-center shrink-0">
@@ -453,12 +406,11 @@ export default function LatestNews({ onClose }) {
                       key={article.id}
                       article={article}
                       index={idx + 1}
-                      onSummarize={summarizeArticle}
-                      summarizing={summarizing}
                     />
                   ))}
                 </div>
 
+                {/* Summary area is disabled, so no summaries will appear */}
                 {(summary || summarizing) && (
                   <div>
                     {summarizing ? (
