@@ -7,6 +7,7 @@ const http = require("http");
 const authMiddleware = require("./middlewares/authmiddleware.js");
 const path = require('path')
 const fs = require('fs')
+const newsRoutes = require("./routes/newsRoutes");
 
 
 const PORT = 5000;
@@ -27,6 +28,7 @@ app.use("/api/auth", require("./routes/auth.js"));
 app.get("/me", authMiddleware, (req, res) => {
   res.json({ message: "You are authenticated", userId: req.userId });
 });
+app.use("/api/news", newsRoutes);
 
 app.use(authMiddleware);
 
