@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   DocumentTextIcon,
   ChatBubbleLeftRightIcon,
@@ -35,19 +35,39 @@ export default function UploadGate({
   websiteError,
   websiteProgress,
 }) {
-  const [mode, setMode] = useState(null); // null | "pdf" | "youtube" | "website" | "news"
+  const [mode, setMode] = useState(null);
+  const [pendingUrl, setPendingUrl] = useState(null);
 
-  // ── Mode selector ────────────────────────────────────────────────────
+  // Called from LatestNews → switch to website mode and auto-crawl the article
+  const handleChatWithUrl = (url) => {
+    setWebsiteUrl(url);
+    setPendingUrl(url);
+    setMode("website");
+  };
+
+  // Once parent websiteUrl syncs, fire the submit
+  useEffect(() => {
+    if (mode === "website" && pendingUrl && websiteUrl === pendingUrl) {
+      const t = setTimeout(() => {
+        onWebsiteSubmit();
+        setPendingUrl(null);
+      }, 150);
+      return () => clearTimeout(t);
+    }
+  }, [mode, pendingUrl, websiteUrl]);
+
+  const goHome = () => {
+    setPendingUrl(null);
+    setMode(null);
+  };
+
+  // ── Home ─────────────────────────────────────────────────────────────
   if (!mode) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-6">
         <div className="text-center mb-2">
-          <h2 className="text-white font-semibold text-lg">
-            What do you want to chat with?
-          </h2>
-          <p className="text-zinc-500 text-sm mt-1">
-            Choose a source to get started
-          </p>
+          <h2 className="text-white font-semibold text-lg">What do you want to chat with?</h2>
+          <p className="text-zinc-500 text-sm mt-1">Choose a source to get started</p>
         </div>
 
         <div className="flex gap-4 flex-wrap justify-center">
@@ -106,9 +126,7 @@ export default function UploadGate({
             </div>
             <div className="text-center">
               <p className="text-white font-medium text-sm">Latest News</p>
-              <p className="text-zinc-500 text-xs mt-1">
-                Building stage — some features may not work
-              </p>
+              <p className="text-zinc-500 text-xs mt-1">Search & chat with articles</p>
             </div>
           </button>
         </div>
@@ -121,52 +139,36 @@ export default function UploadGate({
     );
   }
 
-  // ── PDF mode ─────────────────────────────────────────────────────────
+  // ── PDF ──────────────────────────────────────────────────────────────
   if (mode === "pdf") {
     return (
       <div className="h-full flex flex-col items-center justify-center">
-        <button
-          onClick={() => setMode(null)}
-          className="mb-6 text-xs text-zinc-500 hover:text-zinc-300 transition cursor-pointer"
-        >
+        <button onClick={goHome} className="mb-6 text-xs text-zinc-500 hover:text-zinc-300 transition cursor-pointer">
           ← Back
         </button>
-
         <div
           onDrop={onDrop}
           onDragOver={onDragOver}
           onDragLeave={onDragLeave}
           onClick={onClick}
-          className={`cursor-pointer w-full max-w-lg border-2 border-dashed rounded-2xl p-14 flex flex-col items-center gap-5 transition-all duration-200 ${
-            uploading
-              ? "border-indigo-500 bg-indigo-500/5 cursor-wait"
-              : dragOver
-              ? "border-indigo-500 bg-indigo-500/10"
-              : "border-zinc-700 hover:border-zinc-500 hover:bg-zinc-900"
-          }`}
+          className={`cursor-pointer w-full max-w-lg border-2 border-dashed rounded-2xl p-14 flex flex-col items-center gap-5 transition-all duration-200 ${uploading ? "border-indigo-500 bg-indigo-500/5 cursor-wait"
+              : dragOver ? "border-indigo-500 bg-indigo-500/10"
+                : "border-zinc-700 hover:border-zinc-500 hover:bg-zinc-900"
+            }`}
         >
           <div className="w-16 h-16 rounded-2xl bg-zinc-800 flex items-center justify-center">
-            {uploading ? (
-              <span className="w-7 h-7 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <DocumentTextIcon className="w-8 h-8 text-indigo-400" />
-            )}
+            {uploading
+              ? <span className="w-7 h-7 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
+              : <DocumentTextIcon className="w-8 h-8 text-indigo-400" />}
           </div>
           <div className="text-center">
-            <p className="text-white font-semibold text-base">
-              {uploading ? "Uploading…" : "Upload a PDF"}
-            </p>
-            <p className="text-zinc-500 text-sm mt-1.5">
-              {uploading ? "Please wait" : "Drag & drop or click to browse"}
-            </p>
+            <p className="text-white font-semibold text-base">{uploading ? "Uploading…" : "Upload a PDF"}</p>
+            <p className="text-zinc-500 text-sm mt-1.5">{uploading ? "Please wait" : "Drag & drop or click to browse"}</p>
           </div>
           {!uploading && (
-            <span className="text-xs text-zinc-600 bg-zinc-800 px-4 py-1.5 rounded-full">
-              .pdf files only
-            </span>
+            <span className="text-xs text-zinc-600 bg-zinc-800 px-4 py-1.5 rounded-full">.pdf files only</span>
           )}
         </div>
-
         {uploadError && (
           <p className="mt-4 text-sm text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-4 py-2.5 max-w-lg w-full text-center">
             {uploadError}
@@ -176,45 +178,31 @@ export default function UploadGate({
     );
   }
 
-  // ── YouTube mode ──────────────────────────────────────────────────────
+  // ── YouTube ──────────────────────────────────────────────────────────
   if (mode === "youtube") {
     return (
       <div className="h-full flex flex-col items-center justify-center">
-        <button
-          onClick={() => setMode(null)}
-          className="mb-6 text-xs text-zinc-500 hover:text-zinc-300 transition cursor-pointer"
-        >
+        <button onClick={goHome} className="mb-6 text-xs text-zinc-500 hover:text-zinc-300 transition cursor-pointer">
           ← Back
         </button>
-
         <div className="w-full max-w-lg flex flex-col items-center gap-6">
           <div className="w-16 h-16 rounded-2xl bg-zinc-800 flex items-center justify-center">
-            {youtubeLoading ? (
-              <span className="w-7 h-7 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <YouTubeIcon className="w-8 h-8 text-red-400" />
-            )}
+            {youtubeLoading
+              ? <span className="w-7 h-7 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
+              : <YouTubeIcon className="w-8 h-8 text-red-400" />}
           </div>
-
           <div className="text-center">
-            <p className="text-white font-semibold text-base">
-              {youtubeLoading ? "Processing video…" : "Paste a YouTube URL"}
-            </p>
+            <p className="text-white font-semibold text-base">{youtubeLoading ? "Processing video…" : "Paste a YouTube URL"}</p>
             <p className="text-zinc-500 text-sm mt-1.5">
-              {youtubeLoading
-                ? "Fetching transcript, please wait"
-                : "We'll extract the transcript and let you chat with it"}
+              {youtubeLoading ? "Fetching transcript, please wait" : "We'll extract the transcript and let you chat with it"}
             </p>
           </div>
-
           <div className="w-full flex gap-2">
             <input
               type="text"
               value={youtubeUrl}
               onChange={(e) => setYoutubeUrl(e.target.value)}
-              onKeyDown={(e) =>
-                e.key === "Enter" && !youtubeLoading && onYoutubeSubmit()
-              }
+              onKeyDown={(e) => e.key === "Enter" && !youtubeLoading && onYoutubeSubmit()}
               placeholder="https://www.youtube.com/watch?v=..."
               disabled={youtubeLoading}
               className="flex-1 bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-red-500/70 transition"
@@ -227,146 +215,94 @@ export default function UploadGate({
               {youtubeLoading ? "Loading…" : "Go"}
             </button>
           </div>
-
           {youtubeError && (
             <p className="text-sm text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-4 py-2.5 w-full text-center">
               {youtubeError}
             </p>
           )}
-
           <p className="text-xs text-zinc-600 text-center">
-            Works with any YouTube video that has captions or auto-generated
-            subtitles
+            Works with any YouTube video that has captions or auto-generated subtitles
           </p>
         </div>
       </div>
     );
   }
 
-  // ── Website mode ──────────────────────────────────────────────────────
+  // ── Website ──────────────────────────────────────────────────────────
   if (mode === "website") {
     return (
       <div className="h-full flex flex-col items-center justify-center">
-        <button
-          onClick={() => setMode(null)}
-          className="mb-6 text-xs text-zinc-500 hover:text-zinc-300 transition cursor-pointer"
-        >
+        {/* Back always visible — critical so user is never trapped */}
+        <button onClick={goHome} className="mb-6 text-xs text-zinc-500 hover:text-zinc-300 transition cursor-pointer">
           ← Back
         </button>
-
         <div className="w-full max-w-lg flex flex-col items-center gap-6">
           <div className="w-16 h-16 rounded-2xl bg-zinc-800 flex items-center justify-center">
-            {websiteLoading ? (
-              <span className="w-7 h-7 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <GlobeAltIcon className="w-8 h-8 text-emerald-400" />
-            )}
+            {websiteLoading
+              ? <span className="w-7 h-7 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
+              : <GlobeAltIcon className="w-8 h-8 text-emerald-400" />}
           </div>
-
           <div className="text-center">
             <p className="text-white font-semibold text-base">
-              {websiteLoading
-                ? websiteProgress || "Crawling pages…"
-                : "Paste a Website URL"}
+              {websiteLoading ? websiteProgress || "Crawling page…" : "Paste a Website URL"}
             </p>
             <p className="text-zinc-500 text-sm mt-1.5">
               {websiteLoading
-                ? "Scraping up to 10 pages — this may take a moment"
+                ? "Scraping content — this may take a moment"
                 : "We'll crawl up to 10 pages and let you chat with all of them"}
             </p>
           </div>
 
-          <div className="w-full flex gap-2">
-            <input
-              type="text"
-              value={websiteUrl}
-              onChange={(e) => setWebsiteUrl(e.target.value)}
-              onKeyDown={(e) =>
-                e.key === "Enter" && !websiteLoading && onWebsiteSubmit()
-              }
-              placeholder="https://docs.python.org/3/tutorial/"
-              disabled={websiteLoading}
-              className="flex-1 bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500/70 transition"
-            />
-            <button
-              onClick={onWebsiteSubmit}
-              disabled={websiteLoading || !websiteUrl.trim()}
-              className="px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 disabled:text-zinc-500 text-white text-sm font-medium transition cursor-pointer"
-            >
-              {websiteLoading ? "Crawling…" : "Crawl"}
-            </button>
-          </div>
-
-          {websiteError && (
-            <p className="text-sm text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-4 py-2.5 w-full text-center">
-              {websiteError}
+          {/* Show URL being auto-loaded from news article */}
+          {pendingUrl ? (
+            <p className="text-xs text-zinc-500 text-center max-w-sm truncate">
+              Loading: <span className="text-zinc-300">{pendingUrl}</span>
             </p>
+          ) : (
+            <>
+              <div className="w-full flex gap-2">
+                <input
+                  type="text"
+                  value={websiteUrl}
+                  onChange={(e) => setWebsiteUrl(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && !websiteLoading && onWebsiteSubmit()}
+                  placeholder="https://example.com/article"
+                  disabled={websiteLoading}
+                  className="flex-1 bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500/70 transition"
+                />
+                <button
+                  onClick={onWebsiteSubmit}
+                  disabled={websiteLoading || !websiteUrl.trim()}
+                  className="px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 disabled:text-zinc-500 text-white text-sm font-medium transition cursor-pointer"
+                >
+                  {websiteLoading ? "Crawling…" : "Crawl"}
+                </button>
+              </div>
+              {websiteError && (
+                <p className="text-sm text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-4 py-2.5 w-full text-center">
+                  {websiteError}
+                </p>
+              )}
+              {!websiteLoading && (
+                <p className="text-xs text-zinc-500 text-center max-w-md">
+                  Works best with websites that don’t require login. Some sites that block bots may not work.
+                </p>
+              )}
+            </>
           )}
-
-          <div className="w-full max-w-lg">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-                <p className="text-emerald-400 text-xs font-semibold mb-2 flex items-center gap-1.5">
-                  <span>✅</span> Works great
-                </p>
-                <ul className="space-y-1">
-                  {[
-                    "Documentation sites",
-                    "Wikipedia pages",
-                    "Blog posts & articles",
-                    "News articles",
-                    "GitHub READMEs",
-                    "Company / product pages",
-                  ].map((item) => (
-                    <li
-                      key={item}
-                      className="text-zinc-500 text-xs flex items-start gap-1.5"
-                    >
-                      <span className="text-zinc-700 mt-0.5">•</span>
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-                <p className="text-red-400 text-xs font-semibold mb-2 flex items-center gap-1.5">
-                  <span>❌</span> Won't work
-                </p>
-                <ul className="space-y-1">
-                  {[
-                    "Login-protected pages",
-                    "Twitter, LinkedIn, Gmail",
-                    "Notion, Figma, Canva",
-                    "Paywalled content",
-                    "Cloudflare-blocked sites",
-                    "JavaScript-only apps",
-                  ].map((item) => (
-                    <li
-                      key={item}
-                      className="text-zinc-500 text-xs flex items-start gap-1.5"
-                    >
-                      <span className="text-zinc-700 mt-0.5">•</span>
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-
-            <p className="text-zinc-400 text-xs text-center mt-3">
-              Tip — if you can see the content without logging in, it will work
-              👍
-            </p>
-          </div>
         </div>
       </div>
     );
   }
 
-  // ── News mode ─────────────────────────────────────────────────────────
+  // ── News ─────────────────────────────────────────────────────────────
   if (mode === "news") {
-    return <LatestNews onClose={() => setMode(null)} />;
+    return (
+      <LatestNews
+        onClose={() => setMode(null)}
+        onChatWithUrl={handleChatWithUrl}
+      />
+    );
   }
 
   return null;

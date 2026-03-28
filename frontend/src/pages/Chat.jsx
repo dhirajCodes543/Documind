@@ -25,155 +25,83 @@ export default function Chat() {
   const [dragOver, setDragOver] = useState(false);
   const [showYoutubeInput, setShowYoutubeInput] = useState(false);
   const [showWebsiteInput, setShowWebsiteInput] = useState(false);
+  // Incrementing this force-remounts UploadGate, wiping mode/pendingUrl — new chat always works
+  const [uploadGateKey, setUploadGateKey] = useState(0);
 
   const fileInputRef = useRef(null);
 
-  const {
-    chatHistory,
-    historyLoading,
-    prependChat,
-    setChatHistory,
-    removeChat,
-  } = useChatHistory();
+  const { chatHistory, historyLoading, prependChat, setChatHistory, removeChat } = useChatHistory();
 
-  const {
-    messages,
-    isTyping,
-    sendError,
-    setSendError,
-    sendMessage,
-    loadMessages,
-    appendMessage,
-    clearMessages,
-    setMessages,
-  } = useMessages();
+  const { messages, isTyping, sendError, setSendError, sendMessage, appendMessage, clearMessages, setMessages } = useMessages();
 
-  const {
-    uploadedPdfs,
-    uploading,
-    uploadError,
-    handlePdfSelect,
-    resetPdfs,
-    clearError,
-  } = usePdfUpload({
+  const { uploadedPdfs, uploading, uploadError, handlePdfSelect, resetPdfs, clearError } = usePdfUpload({
     activeChatId,
     onSuccess: (data) => handleSourceSuccess(data, false, false),
   });
 
-  const {
-    youtubeUrl,
-    setYoutubeUrl,
-    youtubeLoading,
-    youtubeError,
-    handleYoutubeSubmit,
-    clearYoutubeError,
-  } = useYoutube({
+  const { youtubeUrl, setYoutubeUrl, youtubeLoading, youtubeError, handleYoutubeSubmit, clearYoutubeError } = useYoutube({
     activeChatId,
     onSuccess: (data) => handleSourceSuccess(data, true, false),
     onStart: () => {
       const tempId = `temp-yt-${Date.now()}`;
-      resetPdfs((prev) => [
-        ...prev,
-        { id: tempId, name: "Processing video…", uploading: true, isYoutube: true },
-      ]);
+      resetPdfs((prev) => [...prev, { id: tempId, name: "Processing video…", uploading: true, isYoutube: true }]);
       return tempId;
     },
     onFinish: (tempId, data) => {
-      resetPdfs((prev) =>
-        prev.map((p) =>
-          p.id === tempId
-            ? { id: data.documentId, name: data.filename, uploading: false, isYoutube: true }
-            : p
-        )
-      );
+      resetPdfs((prev) => prev.map((p) =>
+        p.id === tempId ? { id: data.documentId, name: data.filename, uploading: false, isYoutube: true } : p
+      ));
     },
-    onError: (tempId) => {
-      resetPdfs((prev) => prev.filter((p) => p.id !== tempId));
-    },
+    onError: (tempId) => resetPdfs((prev) => prev.filter((p) => p.id !== tempId)),
   });
 
-  const {
-    websiteUrl,
-    setWebsiteUrl,
-    websiteLoading,
-    websiteError,
-    websiteProgress,
-    handleWebsiteSubmit,
-    clearWebsiteError,
-  } = useWebsite({
+  const { websiteUrl, setWebsiteUrl, websiteLoading, websiteError, websiteProgress, handleWebsiteSubmit, clearWebsiteError } = useWebsite({
     activeChatId,
     onSuccess: (data) => handleSourceSuccess(data, false, true),
     onStart: () => {
       const tempId = `temp-web-${Date.now()}`;
-      resetPdfs((prev) => [
-        ...prev,
-        { id: tempId, name: "Crawling website…", uploading: true, isWebsite: true },
-      ]);
+      resetPdfs((prev) => [...prev, { id: tempId, name: "Crawling website…", uploading: true, isWebsite: true }]);
       return tempId;
     },
     onFinish: (tempId, data) => {
-      resetPdfs((prev) =>
-        prev.map((p) =>
-          p.id === tempId
-            ? {
-                id: data.documentId,
-                name: `${data.filename} (${data.pagesScraped} pages)`,
-                uploading: false,
-                isWebsite: true,
-              }
-            : p
-        )
-      );
+      resetPdfs((prev) => prev.map((p) =>
+        p.id === tempId
+          ? { id: data.documentId, name: `${data.filename} (${data.pagesScraped} pages)`, uploading: false, isWebsite: true }
+          : p
+      ));
     },
-    onError: (tempId) => {
-      resetPdfs((prev) => prev.filter((p) => p.id !== tempId));
-    },
+    onError: (tempId) => resetPdfs((prev) => prev.filter((p) => p.id !== tempId)),
   });
 
   // ── Shared success handler ─────────────────────────────────────────────
   const handleSourceSuccess = (data, isYoutube = false, isWebsite = false) => {
+    setPdf({ name: data.filename });
+    setActiveChatId(data.chatId);
+
     if (!activeChatId) {
-      navigate(`/chat/${data.chatId}`);
       prependChat({
         id: data.chatId,
         title: data.filename,
         createdAt: new Date().toISOString(),
-        documents: [
-          { id: data.documentId, filename: data.filename, isYoutube, isWebsite },
-        ],
+        documents: [{ id: data.documentId, filename: data.filename, isYoutube, isWebsite }],
       });
+      navigate(`/chat/${data.chatId}`);
     } else {
-      setChatHistory((prev) =>
-        prev.map((c) =>
-          c.id === data.chatId
-            ? {
-                ...c,
-                documents: [
-                  ...(c.documents ?? []),
-                  { id: data.documentId, filename: data.filename, isYoutube, isWebsite },
-                ],
-              }
-            : c
-        )
-      );
+      setChatHistory((prev) => prev.map((c) =>
+        c.id === data.chatId
+          ? { ...c, documents: [...(c.documents ?? []), { id: data.documentId, filename: data.filename, isYoutube, isWebsite }] }
+          : c
+      ));
     }
-
-    setActiveChatId(data.chatId);
-    setPdf({ name: data.filename });
 
     appendMessage({
       role: "assistant",
-      text:
-        messages.length === 0
-          ? isYoutube
-            ? `🎬 I've loaded the transcript for **${data.filename}**. Ask me anything about it!`
-            : isWebsite
-            ? `🌐 I've crawled **${data.pagesScraped} pages** from **${data.filename}**. Ask me anything about the site!`
-            : `📄 I've loaded **${data.filename}**. Ask me anything about it!`
-          : isYoutube
-          ? `🎬 Also loaded **${data.filename}**. Feel free to ask about any of your sources!`
-          : isWebsite
-          ? `🌐 Also crawled **${data.pagesScraped} pages** from **${data.filename}**!`
+      text: messages.length === 0
+        ? isYoutube ? `🎬 I've loaded the transcript for **${data.filename}**. Ask me anything about it!`
+          : isWebsite ? `🌐 I've crawled **${data.pagesScraped} pages** from **${data.filename}**. Ask me anything about the site!`
+          : `📄 I've loaded **${data.filename}**. Ask me anything about it!`
+        : isYoutube ? `🎬 Also loaded **${data.filename}**. Feel free to ask about any of your sources!`
+          : isWebsite ? `🌐 Also crawled **${data.pagesScraped} pages** from **${data.filename}**!`
           : `📄 Also loaded **${data.filename}**. Feel free to ask about any of your sources!`,
       id: Date.now(),
     });
@@ -182,14 +110,12 @@ export default function Chat() {
   // ── Load chat from URL param ───────────────────────────────────────────
   useEffect(() => {
     if (!urlChatId) {
-      // No chatId in URL — reset everything
       setPdf(null);
       resetPdfs([]);
       clearMessages();
       setActiveChatId(null);
       return;
     }
-
     if (urlChatId === activeChatId) return;
     if (historyLoading) return;
 
@@ -203,28 +129,18 @@ export default function Chat() {
     const found = chatHistory.find((c) => c.id === urlChatId);
     if (found) {
       setPdf({ name: found.title });
-      resetPdfs(
-        (found.documents ?? []).map((d) => ({
-          id: d.id,
-          name: d.filename,
-          uploading: false,
-          isYoutube: d.isYoutube ?? false,
-          isWebsite: d.isWebsite ?? false,
-        }))
-      );
+      resetPdfs((found.documents ?? []).map((d) => ({
+        id: d.id, name: d.filename, uploading: false,
+        isYoutube: d.isYoutube ?? false, isWebsite: d.isWebsite ?? false,
+      })));
     }
 
-    // ✅ Load messages inline — handle 404 properly
-    api
-      .get(`/api/chat/${urlChatId}/messages`)
+    api.get(`/api/chat/${urlChatId}/messages`)
       .then(({ data }) => {
-        setMessages(
-          data.messages.map((m) => ({ role: m.role, text: m.content, id: m.id }))
-        );
+        setMessages(data.messages.map((m) => ({ role: m.role, text: m.content, id: m.id })));
       })
       .catch((err) => {
         if (err.response?.status === 404) {
-          // Chat no longer exists — reset to clean state
           setPdf(null);
           resetPdfs([]);
           clearMessages();
@@ -237,7 +153,7 @@ export default function Chat() {
       });
   }, [urlChatId, chatHistory, historyLoading]);
 
-  // ── New chat ───────────────────────────────────────────────────────────
+  // ── New chat — always works regardless of what's loading ──────────────
   const startNewChat = () => {
     setPdf(null);
     resetPdfs([]);
@@ -248,10 +164,13 @@ export default function Chat() {
     clearError();
     clearYoutubeError();
     clearWebsiteError();
+    setWebsiteUrl("");
+    setYoutubeUrl("");
     setShowYoutubeInput(false);
     setShowWebsiteInput(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
-    navigate("/chat", { replace: true }); // ✅ replace so back button doesn't go to deleted chat
+    setUploadGateKey((k) => k + 1); // force-remount UploadGate
+    navigate("/chat", { replace: true });
   };
 
   const handleLogout = async () => {
@@ -264,7 +183,6 @@ export default function Chat() {
   return (
     <div className="flex h-screen bg-zinc-950 text-white overflow-hidden">
 
-      {/* Always-present hidden file input */}
       <input
         ref={fileInputRef}
         type="file"
@@ -299,14 +217,11 @@ export default function Chat() {
         <div className="flex-1 overflow-y-auto px-6 py-8">
           {!pdf ? (
             <UploadGate
+              key={uploadGateKey}
               uploading={uploading}
               dragOver={dragOver}
               uploadError={uploadError}
-              onDrop={(e) => {
-                e.preventDefault();
-                setDragOver(false);
-                handlePdfSelect(e.dataTransfer.files[0]);
-              }}
+              onDrop={(e) => { e.preventDefault(); setDragOver(false); handlePdfSelect(e.dataTransfer.files[0]); }}
               onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
               onDragLeave={() => setDragOver(false)}
               onClick={() => !uploading && fileInputRef.current?.click()}
@@ -340,15 +255,13 @@ export default function Chat() {
           sendError={sendError}
           uploadError={uploadError}
           onVoiceReply={({ userText, assistantText }) => {
-            if (userText)
-              appendMessage({ role: "user", text: userText, id: Date.now() });
-            if (assistantText)
-              appendMessage({ role: "assistant", text: assistantText, id: Date.now() + 1 });
+            if (userText) appendMessage({ role: "user", text: userText, id: Date.now() });
+            if (assistantText) appendMessage({ role: "assistant", text: assistantText, id: Date.now() + 1 });
           }}
         />
       </div>
 
-      {/* ── YouTube URL modal ──────────────────────────────────────── */}
+      {/* YouTube modal */}
       {showYoutubeInput && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="bg-zinc-900 border border-zinc-700 rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl">
@@ -362,10 +275,7 @@ export default function Chat() {
                 value={youtubeUrl}
                 onChange={(e) => setYoutubeUrl(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && !youtubeLoading) {
-                    handleYoutubeSubmit();
-                    setShowYoutubeInput(false);
-                  }
+                  if (e.key === "Enter" && !youtubeLoading) { handleYoutubeSubmit(); setShowYoutubeInput(false); }
                   if (e.key === "Escape") setShowYoutubeInput(false);
                 }}
                 placeholder="https://www.youtube.com/watch?v=..."
@@ -373,39 +283,29 @@ export default function Chat() {
                 className="flex-1 bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-red-500/70 transition"
               />
               <button
-                onClick={() => {
-                  handleYoutubeSubmit();
-                  setShowYoutubeInput(false);
-                }}
+                onClick={() => { handleYoutubeSubmit(); setShowYoutubeInput(false); }}
                 disabled={youtubeLoading || !youtubeUrl.trim()}
                 className="px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 disabled:bg-zinc-700 disabled:text-zinc-500 text-white text-sm font-medium transition cursor-pointer"
               >
                 {youtubeLoading ? "…" : "Go"}
               </button>
             </div>
-            {youtubeError && (
-              <p className="text-xs text-red-400 mt-2">{youtubeError}</p>
-            )}
-            <button
-              onClick={() => setShowYoutubeInput(false)}
-              className="mt-3 text-xs text-zinc-600 hover:text-zinc-400 transition cursor-pointer"
-            >
+            {youtubeError && <p className="text-xs text-red-400 mt-2">{youtubeError}</p>}
+            <button onClick={() => setShowYoutubeInput(false)} className="mt-3 text-xs text-zinc-600 hover:text-zinc-400 transition cursor-pointer">
               Cancel
             </button>
           </div>
         </div>
       )}
 
-      {/* ── Website URL modal ──────────────────────────────────────── */}
+      {/* Website modal */}
       {showWebsiteInput && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="bg-zinc-900 border border-zinc-700 rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl">
             <h3 className="text-white font-semibold text-sm mb-1 flex items-center gap-2">
               <span className="text-emerald-400">🌐</span> Crawl a Website
             </h3>
-            <p className="text-zinc-500 text-xs mb-4">
-              We'll scrape the page and let you chat with its content
-            </p>
+            <p className="text-zinc-500 text-xs mb-4">We'll scrape the page and let you chat with its content</p>
             <div className="flex gap-2">
               <input
                 autoFocus
@@ -413,10 +313,7 @@ export default function Chat() {
                 value={websiteUrl}
                 onChange={(e) => setWebsiteUrl(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && !websiteLoading) {
-                    handleWebsiteSubmit();
-                    setShowWebsiteInput(false);
-                  }
+                  if (e.key === "Enter" && !websiteLoading) { handleWebsiteSubmit(); setShowWebsiteInput(false); }
                   if (e.key === "Escape") setShowWebsiteInput(false);
                 }}
                 placeholder="https://example.com/article"
@@ -424,29 +321,20 @@ export default function Chat() {
                 className="flex-1 bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500/70 transition"
               />
               <button
-                onClick={() => {
-                  handleWebsiteSubmit();
-                  setShowWebsiteInput(false);
-                }}
+                onClick={() => { handleWebsiteSubmit(); setShowWebsiteInput(false); }}
                 disabled={websiteLoading || !websiteUrl.trim()}
                 className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 disabled:text-zinc-500 text-white text-sm font-medium transition cursor-pointer"
               >
                 {websiteLoading ? "…" : "Go"}
               </button>
             </div>
-            {websiteError && (
-              <p className="text-xs text-red-400 mt-2">{websiteError}</p>
-            )}
-            <button
-              onClick={() => setShowWebsiteInput(false)}
-              className="mt-3 text-xs text-zinc-600 hover:text-zinc-400 transition cursor-pointer"
-            >
+            {websiteError && <p className="text-xs text-red-400 mt-2">{websiteError}</p>}
+            <button onClick={() => setShowWebsiteInput(false)} className="mt-3 text-xs text-zinc-600 hover:text-zinc-400 transition cursor-pointer">
               Cancel
             </button>
           </div>
         </div>
       )}
-
     </div>
   );
 }

@@ -1,442 +1,258 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import {
   MagnifyingGlassIcon,
   NewspaperIcon,
-  ArrowTopRightOnSquareIcon,
-  ClockIcon,
-  SparklesIcon,
   XMarkIcon,
+  TrashIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
 } from "@heroicons/react/24/outline";
-import ReactMarkdown from "react-markdown";
+import ArticleCard from "./Articlecard";
 import api from "../Api";
 
-// ── Markdown renderer (unchanged) ──────────────────────────────────────────
-const mdComponents = {
-  p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-  strong: ({ children }) => (
-    <strong className="text-white font-semibold">{children}</strong>
-  ),
-  ul: ({ children }) => (
-    <ul className="list-disc list-inside space-y-1 mb-2">{children}</ul>
-  ),
-  ol: ({ children }) => (
-    <ol className="list-decimal list-inside space-y-1 mb-2">{children}</ol>
-  ),
-  li: ({ children }) => <li className="text-zinc-300">{children}</li>,
-  h1: ({ children }) => (
-    <h1 className="text-base font-bold text-white mb-2">{children}</h1>
-  ),
-  h2: ({ children }) => (
-    <h2 className="text-sm font-bold text-white mb-1.5">{children}</h2>
-  ),
-  h3: ({ children }) => (
-    <h3 className="text-sm font-semibold text-white mb-1">{children}</h3>
-  ),
-  code: ({ children }) => (
-    <code className="bg-zinc-900 text-indigo-300 px-1.5 py-0.5 rounded text-xs font-mono">
-      {children}
-    </code>
-  ),
-  blockquote: ({ children }) => (
-    <blockquote className="border-l-2 border-indigo-500 pl-3 text-zinc-400 italic">
-      {children}
-    </blockquote>
-  ),
-};
+const SESSION_KEY = "documind_news_searches";
 
-// ── Helpers ────────────────────────────────────────────────────────────────
-function formatPubDate(dateStr) {
-  if (!dateStr) return "";
-  const d = new Date(dateStr);
-  if (isNaN(d)) return dateStr;
-
-  const now = new Date();
-  const diff = Math.floor((now - d) / 60000);
-
-  if (diff < 1) return "Just now";
-  if (diff < 60) return `${diff}m ago`;
-  if (diff < 1440) return `${Math.floor(diff / 60)}h ago`;
-
-  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+function saveSearches(s) {
+  try { sessionStorage.setItem(SESSION_KEY, JSON.stringify(s)); } catch {}
+}
+function loadSearches() {
+  try { const r = sessionStorage.getItem(SESSION_KEY); return r ? JSON.parse(r) : []; } catch { return []; }
 }
 
-// ── Article card ───────────────────────────────────────────────────────────
-function ArticleCard({ article, index }) {
-  // Summarize is disabled for now
-  const isDisabled = true;
+// ── Collapsible topic block ────────────────────────────────────────────────
+function TopicSection({ search, onChatWith, onRemove, resolvingArticleId }) {
+  const [collapsed, setCollapsed] = useState(false);
 
   return (
-    <div className="group relative rounded-2xl border border-zinc-800 bg-zinc-900/90 p-3 hover:border-zinc-700 transition-all duration-200 shadow-md">
-      <div className="flex gap-3">
-        <div className="shrink-0 w-7 h-7 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-xs text-zinc-300 font-medium">
-          {index}
-        </div>
-
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-2">
-            <p className="text-sm md:text-base text-white font-semibold leading-snug flex-1 pr-2">
-              {article.title}
-            </p>
-
-            {article.link ? (
-              <a
-                href={article.link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="shrink-0 inline-flex items-center justify-center w-8 h-8 rounded-xl border border-zinc-700 bg-zinc-800/80 text-zinc-300 hover:text-white hover:border-zinc-500 active:scale-95 active:bg-zinc-700 transition-all duration-150"
-                title="Open article"
-              >
-                <ArrowTopRightOnSquareIcon className="w-4 h-4" />
-              </a>
-            ) : null}
-          </div>
-
-          <div className="flex items-center gap-2 mt-2 flex-wrap">
-            {article.source && article.source !== "Unknown" && (
-              <span className="text-[10px] bg-zinc-800 border border-zinc-700 text-zinc-300 px-2 py-0.5 rounded-full">
-                {article.source}
-              </span>
-            )}
-
-            {article.pubDate && (
-              <span className="text-[10px] text-zinc-400 flex items-center gap-1">
-                <ClockIcon className="w-3 h-3" />
-                {formatPubDate(article.pubDate)}
-              </span>
-            )}
-          </div>
-
-          {article.contentSnippet && (
-            <p className="text-xs text-zinc-400 mt-2 leading-6 line-clamp-2">
-              {article.contentSnippet}
-            </p>
-          )}
-
-          <button
-            disabled={isDisabled}
-            className="mt-3 inline-flex items-center gap-1.5 rounded-xl border border-zinc-600 bg-zinc-800/50 px-3 py-1.5 text-xs font-medium text-zinc-500 cursor-not-allowed transition-all duration-150"
-            title="Summarization feature coming soon"
-          >
-            <SparklesIcon className="w-3.5 h-3.5" />
-            Summarize (coming soon)
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Summary panel (kept but won't be used until feature is enabled) ────────
-function SummaryPanel({ summary, article, onClose }) {
-  return (
-    <div className="bg-zinc-900/95 border border-indigo-500/25 rounded-2xl p-4">
-      <div className="flex items-start justify-between gap-3 mb-3">
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="w-6 h-6 rounded-full bg-indigo-600 flex items-center justify-center text-sm font-bold shrink-0">
-            <SparklesIcon className="w-3.5 h-3.5 text-white" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-[10px] uppercase tracking-wider text-zinc-500">Summary</p>
-            <p className="text-xs text-zinc-300 truncate">{article?.title}</p>
-          </div>
-        </div>
+    <div className="rounded-2xl border border-zinc-800 overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3 bg-zinc-900 border-b border-zinc-800">
         <button
-          onClick={onClose}
-          className="text-zinc-500 hover:text-zinc-200 active:scale-95 active:text-zinc-100 transition-all duration-150 shrink-0"
+          onClick={() => setCollapsed((p) => !p)}
+          className="flex items-center gap-2 flex-1 text-left group min-w-0"
         >
-          <XMarkIcon className="w-4 h-4" />
+          <NewspaperIcon className="w-4 h-4 text-amber-400 shrink-0" />
+          <span className="text-sm font-semibold text-white capitalize truncate">{search.topic}</span>
+          <span className="text-[10px] text-zinc-600 shrink-0 ml-1">{search.articles.length} articles</span>
+          <span className="ml-auto shrink-0 text-zinc-600 group-hover:text-zinc-400 transition">
+            {collapsed ? <ChevronDownIcon className="w-3.5 h-3.5" /> : <ChevronUpIcon className="w-3.5 h-3.5" />}
+          </span>
+        </button>
+        <button
+          onClick={() => onRemove(search.topic)}
+          className="ml-3 shrink-0 p-1.5 rounded-lg text-zinc-600 hover:text-red-400 hover:bg-zinc-800 transition cursor-pointer"
+          title="Remove topic"
+        >
+          <TrashIcon className="w-3.5 h-3.5" />
         </button>
       </div>
-      <div className="text-xs text-zinc-200 leading-6">
-        <ReactMarkdown components={mdComponents}>{summary}</ReactMarkdown>
-      </div>
+
+      {!collapsed && (
+        <div className="p-3 space-y-4 bg-zinc-950/40">
+          {search.articles.map((article, idx) => (
+            <ArticleCard
+              key={article.id ?? idx}
+              article={article}
+              index={idx + 1}
+              onChatWith={onChatWith}
+              isResolving={resolvingArticleId === article.id}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
-// ── Main component with sidebar (summarization disabled) ───────────────────
-export default function LatestNews({ onClose }) {
-  const [topic, setTopic] = useState("");
-  const [newsData, setNewsData] = useState(null);
+// ── Main ───────────────────────────────────────────────────────────────────
+export default function LatestNews({ onClose, onChatWithUrl }) {
+  const [searches, setSearches] = useState(() => loadSearches());
+  const [searchInput, setSearchInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [resolvingArticleId, setResolvingArticleId] = useState(null);
+  const inputRef = useRef(null);
 
-  const [newTopicInput, setNewTopicInput] = useState("");
-  const [selectedArticleId, setSelectedArticleId] = useState(""); // dropdown selection
+  useEffect(() => { saveSearches(searches); }, [searches]);
 
-  // Summary state – kept but won't be triggered
-  const [summary, setSummary] = useState(null);
-  const [summaryArticle, setSummaryArticle] = useState(null);
-  const [summarizing, setSummarizing] = useState(false);
-  const [summaryError, setSummaryError] = useState("");
+  // Focus search on open
+  useEffect(() => { inputRef.current?.focus(); }, []);
 
-  const overlayScrollRef = useRef(null);
+  const fetchNews = useCallback(async (rawTopic) => {
+    const cleaned = rawTopic.trim();
+    if (!cleaned) return;
 
-  const fetchNews = async (rawTopic) => {
-    const cleanedTopic = rawTopic.trim();
-    if (!cleanedTopic) return;
+    if (searches.some((s) => s.topic.toLowerCase() === cleaned.toLowerCase())) {
+      setError(`"${cleaned}" is already loaded.`);
+      setSearchInput("");
+      return;
+    }
 
     setLoading(true);
     setError("");
-    setSummary(null);
-    setSummaryArticle(null);
-    setSummaryError("");
-
     try {
-      const { data } = await api.get("/api/news/latest", {
-        params: { topic: cleanedTopic },
-      });
-
+      const { data } = await api.get("/api/news/latest", { params: { topic: cleaned } });
       if (data.success) {
-        setNewsData(data.data);
-        setTopic(cleanedTopic);
-        setNewTopicInput("");
-        setSelectedArticleId(data.data.articles?.[0]?.id?.toString() || "");
-
-        requestAnimationFrame(() => {
-          if (overlayScrollRef.current) {
-            overlayScrollRef.current.scrollTo({ top: 0, behavior: "smooth" });
-          }
-        });
+        setSearches((prev) => [{ topic: cleaned, articles: data.data.articles, fetchedAt: Date.now() }, ...prev]);
+        setSearchInput("");
       } else {
         setError(data.message || "Failed to fetch news.");
       }
     } catch (err) {
-      setError(
-        err.response?.data?.message || "Failed to fetch news. Please try again."
-      );
+      setError(err.response?.data?.message || "Failed to fetch. Try again.");
     } finally {
       setLoading(false);
     }
+  }, [searches]);
+
+  const removeTopic = (topic) => setSearches((prev) => prev.filter((s) => s.topic !== topic));
+  const clearAll = () => { setSearches([]); sessionStorage.removeItem(SESSION_KEY); };
+
+  const handleChatWith = async (article) => {
+    try {
+      setResolvingArticleId(article.id);
+      setError("");
+
+      const { data } = await api.post("/api/news/resolve-link", {
+        title: article.title,
+      });
+      console.log(data)
+      if (!data?.success) {
+        setError(data?.message || "Could not resolve article link.");
+        return;
+      }
+
+      const candidateLinks = data?.data?.links || [];
+      const firstLink = candidateLinks[0] || "";
+
+      if (!firstLink) {
+        setError("No article link found.");
+        return;
+      }
+
+      onChatWithUrl(firstLink, article.title, candidateLinks);
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to resolve article.");
+    } finally {
+      setResolvingArticleId(null);
+    }
   };
 
-  // Summarization functions are kept but won't be called (buttons disabled)
-  // They will be enabled later when the feature is built
-  const summarizeArticle = async (article) => {
-    // placeholder – not used now
-    console.log("Summarize called for", article);
-  };
-
-  const summarizeById = async (id) => {
-    // placeholder – not used now
-    console.log("Summarize by ID", id);
-  };
-
-  const resetToSearch = () => {
-    setNewsData(null);
-    setTopic("");
-    setSummary(null);
-    setSummaryArticle(null);
-    setError("");
-    setSummaryError("");
-    setSelectedArticleId("");
-    setNewTopicInput("");
-  };
-
-  const truncateTitle = (title, maxLen = 50) => {
-    if (title.length <= maxLen) return title;
-    return title.slice(0, maxLen) + "…";
-  };
+  const totalArticles = searches.reduce((sum, s) => sum + s.articles.length, 0);
 
   return (
-    <div className="fixed inset-0 z-40">
+    <div className="fixed inset-0 z-40 flex flex-col">
       <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
 
       <div className="relative h-full flex flex-col">
         {/* Header */}
-        <div className="shrink-0 border-b border-zinc-800 bg-zinc-950/95 backdrop-blur px-4 py-3">
-          <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-zinc-800 flex items-center justify-center">
-                <NewspaperIcon className="w-4 h-4 text-amber-400" />
-              </div>
-              <div>
-                <h2 className="text-white font-semibold text-base">Latest News</h2>
-                <p className="text-zinc-500 text-[11px]">Search and summarize recent headlines</p>
-              </div>
+        <div className="shrink-0 flex items-center justify-between px-5 py-4 border-b border-zinc-800 bg-zinc-950/95 backdrop-blur">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+              <NewspaperIcon className="w-4 h-4 text-amber-400" />
             </div>
-
-            <button
-              onClick={onClose}
-              className="shrink-0 inline-flex items-center justify-center w-8 h-8 rounded-xl border border-zinc-700 bg-zinc-900 text-zinc-400 hover:text-white hover:border-zinc-500 active:scale-95 active:bg-zinc-800 transition-all duration-150"
-              title="Close"
-            >
-              <XMarkIcon className="w-4 h-4" />
-            </button>
+            <div>
+              <h2 className="text-white font-semibold text-sm">Latest News</h2>
+              <p className="text-zinc-500 text-[11px]">
+                {totalArticles > 0 ? `${totalArticles} articles across ${searches.length} topic${searches.length > 1 ? "s" : ""}` : "Search a topic to load headlines"}
+              </p>
+            </div>
           </div>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl border border-zinc-700 bg-zinc-900 text-zinc-400 hover:text-white hover:border-zinc-500 transition active:scale-95 cursor-pointer">
+            <XMarkIcon className="w-4 h-4" />
+          </button>
         </div>
 
-        {/* Main area: sidebar + content */}
-        <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
-          {/* Sidebar (inputs) */}
-          <div className="w-full md:w-80 border-b md:border-b-0 md:border-r border-zinc-800 bg-zinc-950/50 p-4 overflow-y-auto">
-            <div className="space-y-5">
+        {/* Body: sidebar + content */}
+        <div className="flex-1 flex overflow-hidden">
+
+          {/* ── Left sidebar: search ── */}
+          <div className="w-64 shrink-0 border-r border-zinc-800 bg-zinc-950/60 flex flex-col p-4 gap-4 overflow-y-auto">
+            <div>
+              <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-2">Search topic</p>
+              <div className="relative mb-2">
+                <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none" />
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={searchInput}
+                  onChange={(e) => { setSearchInput(e.target.value); setError(""); }}
+                  onKeyDown={(e) => e.key === "Enter" && !loading && fetchNews(searchInput)}
+                  placeholder="AI, cricket, politics…"
+                  disabled={loading}
+                  className="w-full h-9 bg-zinc-900 border border-zinc-700 rounded-xl pl-9 pr-3 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-amber-500/50 transition disabled:opacity-50"
+                />
+              </div>
+              <button
+                onClick={() => fetchNews(searchInput)}
+                disabled={!searchInput.trim() || loading}
+                className="w-full h-9 rounded-xl text-xs font-semibold bg-amber-500 hover:bg-amber-400 disabled:bg-zinc-800 disabled:text-zinc-600 text-zinc-900 transition active:scale-95 cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                {loading ? (
+                  <>
+                    <span className="w-3 h-3 border-2 border-zinc-500 border-t-transparent rounded-full animate-spin" />
+                    Fetching…
+                  </>
+                ) : "Search"}
+              </button>
+              {error && <p className="text-xs text-red-400 mt-2">{error}</p>}
+            </div>
+
+            {/* Loaded topics list */}
+            {searches.length > 0 && (
               <div>
-                <p className="text-xs uppercase tracking-wider text-zinc-500 font-medium mb-3">
-                  What would you like to do?
-                </p>
-
-                {/* Summarize section with dropdown – fully disabled */}
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center shrink-0">
-                      <SparklesIcon className="w-3.5 h-3.5 text-indigo-400" />
+                <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-2">Loaded topics</p>
+                <div className="space-y-1">
+                  {searches.map((s) => (
+                    <div key={s.topic} className="flex items-center justify-between gap-1 px-2 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800">
+                      <span className="text-xs text-zinc-300 capitalize truncate flex-1">{s.topic}</span>
+                      <span className="text-[10px] text-zinc-600 shrink-0">{s.articles.length}</span>
+                      <button
+                        onClick={() => removeTopic(s.topic)}
+                        className="shrink-0 p-0.5 text-zinc-600 hover:text-red-400 transition cursor-pointer"
+                      >
+                        <XMarkIcon className="w-3 h-3" />
+                      </button>
                     </div>
-                    <span className="text-sm text-zinc-300">Summarize an article by ID</span>
-                  </div>
-                  <div className="flex gap-2">
-                    <select
-                      value={selectedArticleId}
-                      onChange={(e) => setSelectedArticleId(e.target.value)}
-                      disabled={true} // permanently disabled
-                      className="flex-1 h-9 bg-zinc-900 border border-zinc-700 rounded-lg px-3 text-sm text-white opacity-50 cursor-not-allowed"
-                    >
-                      {!newsData ? (
-                        <option>No articles loaded</option>
-                      ) : (
-                        newsData.articles.map((article) => (
-                          <option key={article.id} value={article.id}>
-                            ID: {article.id} - {truncateTitle(article.title)}
-                          </option>
-                        ))
-                      )}
-                    </select>
-                    <button
-                      disabled={true}
-                      className="h-9 px-4 rounded-lg text-xs font-medium bg-zinc-700 text-zinc-500 cursor-not-allowed"
-                      title="Summarization feature coming soon"
-                    >
-                      Summarize (soon)
-                    </button>
-                  </div>
-                  <p className="text-[10px] text-zinc-500 mt-1">
-                    Summarization will be available soon.
-                  </p>
+                  ))}
                 </div>
-
-                <div className="my-4 flex items-center gap-3">
-                  <div className="flex-1 h-px bg-zinc-800" />
-                  <span className="text-[10px] text-zinc-600">or</span>
-                  <div className="flex-1 h-px bg-zinc-800" />
-                </div>
-
-                {/* New search section – fully functional */}
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-emerald-600/20 border border-emerald-500/30 flex items-center justify-center shrink-0">
-                      <MagnifyingGlassIcon className="w-3.5 h-3.5 text-emerald-400" />
-                    </div>
-                    <span className="text-sm text-zinc-300">Get news on a different topic</span>
-                  </div>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={newTopicInput}
-                      onChange={(e) => setNewTopicInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && newTopicInput.trim() && !loading) {
-                          fetchNews(newTopicInput.trim());
-                        }
-                      }}
-                      placeholder="e.g. AI, elections, startups..."
-                      disabled={loading}
-                      className="flex-1 h-9 bg-zinc-900 border border-zinc-700 rounded-lg px-3 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500/50"
-                    />
-                    <button
-                      onClick={() => {
-                        if (newTopicInput.trim()) fetchNews(newTopicInput.trim());
-                      }}
-                      disabled={!newTopicInput.trim() || loading}
-                      className={`h-9 px-4 rounded-lg text-xs font-medium transition-all duration-150 active:scale-95 ${
-                        !newTopicInput.trim() || loading
-                          ? "bg-zinc-700 text-zinc-500 cursor-not-allowed"
-                          : "bg-emerald-600/80 hover:bg-emerald-600 text-white"
-                      }`}
-                    >
-                      {loading ? "..." : "Search"}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Quick reset button when news loaded */}
-                {newsData && (
-                  <button
-                    onClick={resetToSearch}
-                    className="mt-4 w-full text-xs text-zinc-400 hover:text-white border border-zinc-700 hover:border-zinc-500 bg-zinc-900/50 py-2 rounded-lg transition-all duration-150 active:scale-[0.98] active:bg-zinc-800/50"
-                  >
-                    Clear & start over
+                {searches.length > 1 && (
+                  <button onClick={clearAll} className="mt-3 text-[10px] text-zinc-600 hover:text-red-400 transition cursor-pointer w-full text-left">
+                    Clear all
                   </button>
                 )}
               </div>
+            )}
+
+            {/* Tip */}
+            <div className="mt-auto pt-4 border-t border-zinc-800">
+              <p className="text-[10px] text-zinc-700 leading-4">
+                All searches persist until you close this tab. Click <span className="text-zinc-500">Chat with this article</span> on any card to open a chat.
+              </p>
             </div>
           </div>
 
-          {/* Main content area */}
-          <div
-            ref={overlayScrollRef}
-            className="flex-1 overflow-y-auto px-4 py-6"
-          >
-            {!newsData && !loading ? (
-              <div className="flex flex-col items-center justify-center min-h-full text-center">
-                <div className="w-12 h-12 rounded-2xl bg-zinc-800 flex items-center justify-center mb-3">
-                  <NewspaperIcon className="w-6 h-6 text-indigo-400" />
+          {/* ── Right: articles ── */}
+          <div className="flex-1 overflow-y-auto px-5 py-5 space-y-4">
+            {searches.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-center">
+                <div className="w-14 h-14 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center mb-4">
+                  <NewspaperIcon className="w-7 h-7 text-zinc-700" />
                 </div>
-                <h3 className="text-white font-semibold text-lg">No news loaded</h3>
-                <p className="text-zinc-500 text-sm mt-1 max-w-sm">
-                  Use the sidebar to search for a topic and get the latest headlines.
+                <p className="text-zinc-500 text-sm font-medium">No searches yet</p>
+                <p className="text-zinc-700 text-xs mt-1.5 max-w-xs leading-5">
+                  Use the search panel on the left to find headlines on any topic.
                 </p>
               </div>
-            ) : loading ? (
-              <div className="flex flex-col items-center justify-center min-h-full gap-3">
-                <span className="w-6 h-6 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
-                <p className="text-zinc-400 text-xs">Fetching latest news…</p>
-              </div>
             ) : (
-              <div className="max-w-3xl mx-auto space-y-6">
-                <div>
-                  <h2 className="text-white font-semibold text-xl">
-                    Latest on: <span className="text-indigo-400">{newsData.topic}</span>
-                  </h2>
-                  <p className="text-zinc-500 text-xs mt-1">{newsData.total} articles found</p>
-                </div>
-
-                <div className="space-y-3">
-                  {newsData.articles.map((article, idx) => (
-                    <ArticleCard
-                      key={article.id}
-                      article={article}
-                      index={idx + 1}
-                    />
-                  ))}
-                </div>
-
-                {/* Summary area is disabled, so no summaries will appear */}
-                {(summary || summarizing) && (
-                  <div>
-                    {summarizing ? (
-                      <div className="bg-zinc-900/95 border border-indigo-500/20 rounded-2xl p-4 flex items-center gap-3">
-                        <span className="w-5 h-5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin shrink-0" />
-                        <p className="text-xs text-zinc-300">Summarizing article…</p>
-                      </div>
-                    ) : (
-                      <SummaryPanel
-                        summary={summary}
-                        article={summaryArticle}
-                        onClose={() => {
-                          setSummary(null);
-                          setSummaryArticle(null);
-                        }}
-                      />
-                    )}
-                  </div>
-                )}
-
-                {summaryError && (
-                  <p className="text-xs text-red-400 bg-red-400/10 border border-red-400/20 rounded-xl px-3 py-2 text-center">
-                    {summaryError}
-                  </p>
-                )}
-              </div>
+              searches.map((search) => (
+                <TopicSection
+                  key={search.topic}
+                  search={search}
+                  onChatWith={handleChatWith}
+                  onRemove={removeTopic}
+                  resolvingArticleId={resolvingArticleId}
+                />
+              ))
             )}
           </div>
         </div>

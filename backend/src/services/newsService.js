@@ -5,8 +5,8 @@ const parser = new Parser();
 function normalizeTitle(title) {
   return title
     .toLowerCase()
-    .replace(/\s*-\s*[^-]+$/g, "") // remove publisher suffix
-    .replace(/[^a-z0-9\s]/g, " ")  // remove punctuation
+    .replace(/\s*-\s*[^-]+$/g, "")
+    .replace(/[^a-z0-9\s]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -81,7 +81,7 @@ async function getLatestNewsByTopic(topic) {
 
   let articles = (feed.items || []).map((item) => ({
     title: item.title || "",
-    link: item.link || "",
+    googleNewsLink: item.link || "",
     pubDate: item.pubDate || "",
     source:
       item.source && typeof item.source === "object"
@@ -91,7 +91,6 @@ async function getLatestNewsByTopic(topic) {
   }));
 
   articles.sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
-
   articles = dedupeArticles(articles);
 
   articles = articles.slice(0, 10).map((article, index) => ({

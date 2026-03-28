@@ -4,6 +4,7 @@ import ProtectedRoute from "./Protectedroute";
 import SignUp from "./pages/Signup";
 import SignIn from "./pages/Signin";
 import Chat from "./pages/Chat";
+import LatestNews from "./Components/LatestNews";
 
 export default function App() {
   return (
@@ -19,6 +20,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <Chat />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/latest-news"
+            element={
+              <ProtectedRoute>
+                <LatestNews />
               </ProtectedRoute>
             }
           />

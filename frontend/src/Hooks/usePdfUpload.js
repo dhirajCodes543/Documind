@@ -5,9 +5,13 @@ export function usePdfUpload({ activeChatId, onSuccess }) {
   const [uploadedPdfs, setUploadedPdfs] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const handlePdfSelect = async (file) => {
     if (!file || file.type !== "application/pdf") return;
+    
+    // Set processing state IMMEDIATELY
+    setIsProcessing(true);
     setUploadError("");
     setUploading(true);
 
@@ -26,7 +30,6 @@ export function usePdfUpload({ activeChatId, onSuccess }) {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
-      // ✅ Replace temp entry with real one
       setUploadedPdfs((prev) =>
         prev.map((p) =>
           p.id === tempId
@@ -35,10 +38,15 @@ export function usePdfUpload({ activeChatId, onSuccess }) {
         )
       );
 
-      onSuccess(data);
+      // Call onSuccess first, which will set pdf
+      await onSuccess(data);
+      
+      // Clear processing AFTER onSuccess has set pdf
+      setIsProcessing(false);
     } catch (err) {
       setUploadedPdfs((prev) => prev.filter((p) => p.id !== tempId));
       setUploadError(err.response?.data?.error || "Upload failed. Please try again.");
+      setIsProcessing(false); // Clear on error
     } finally {
       setUploading(false);
     }
@@ -54,6 +62,7 @@ export function usePdfUpload({ activeChatId, onSuccess }) {
     uploadedPdfs,
     uploading,
     uploadError,
+    isProcessing,
     handlePdfSelect,
     resetPdfs,
     clearError,
