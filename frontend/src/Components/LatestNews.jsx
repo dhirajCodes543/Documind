@@ -115,7 +115,7 @@ export default function LatestNews({ onClose, onChatWithUrl }) {
       const { data } = await api.post("/api/news/resolve-link", {
         title: article.title,
       });
-      console.log(data)
+      // console.log(data)
       if (!data?.success) {
         setError(data?.message || "Could not resolve article link.");
         return;
