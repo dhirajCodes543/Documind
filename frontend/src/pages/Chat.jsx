@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { useAuth } from "../Authcontext";
 import { useChatHistory } from "../Hooks/useChatHistory";
 import { useMessages } from "../Hooks/useMessages";
@@ -12,10 +12,12 @@ import MessageList from "../Components/MessageList";
 import InputBar from "../Components/InputBar";
 import UploadGate from "../Components/UploadGate";
 import api from "../Api";
+import { NewspaperIcon } from "@heroicons/react/24/outline";
 
 export default function Chat() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const { chatId: urlChatId } = useParams();
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -25,7 +27,6 @@ export default function Chat() {
   const [dragOver, setDragOver] = useState(false);
   const [showYoutubeInput, setShowYoutubeInput] = useState(false);
   const [showWebsiteInput, setShowWebsiteInput] = useState(false);
-  // Incrementing this force-remounts UploadGate, wiping mode/pendingUrl — new chat always works
   const [uploadGateKey, setUploadGateKey] = useState(0);
 
   const fileInputRef = useRef(null);
@@ -48,9 +49,11 @@ export default function Chat() {
       return tempId;
     },
     onFinish: (tempId, data) => {
-      resetPdfs((prev) => prev.map((p) =>
-        p.id === tempId ? { id: data.documentId, name: data.filename, uploading: false, isYoutube: true } : p
-      ));
+      resetPdfs((prev) =>
+        prev.map((p) =>
+          p.id === tempId ? { id: data.documentId, name: data.filename, uploading: false, isYoutube: true } : p
+        )
+      );
     },
     onError: (tempId) => resetPdfs((prev) => prev.filter((p) => p.id !== tempId)),
   });
@@ -64,16 +67,17 @@ export default function Chat() {
       return tempId;
     },
     onFinish: (tempId, data) => {
-      resetPdfs((prev) => prev.map((p) =>
-        p.id === tempId
-          ? { id: data.documentId, name: `${data.filename} (${data.pagesScraped} pages)`, uploading: false, isWebsite: true }
-          : p
-      ));
+      resetPdfs((prev) =>
+        prev.map((p) =>
+          p.id === tempId
+            ? { id: data.documentId, name: `${data.filename} (${data.pagesScraped} pages)`, uploading: false, isWebsite: true }
+            : p
+        )
+      );
     },
     onError: (tempId) => resetPdfs((prev) => prev.filter((p) => p.id !== tempId)),
   });
 
-  // ── Shared success handler ─────────────────────────────────────────────
   const handleSourceSuccess = (data, isYoutube = false, isWebsite = false) => {
     setPdf({ name: data.filename });
     setActiveChatId(data.chatId);
@@ -87,27 +91,48 @@ export default function Chat() {
       });
       navigate(`/chat/${data.chatId}`);
     } else {
-      setChatHistory((prev) => prev.map((c) =>
-        c.id === data.chatId
-          ? { ...c, documents: [...(c.documents ?? []), { id: data.documentId, filename: data.filename, isYoutube, isWebsite }] }
-          : c
-      ));
+      setChatHistory((prev) =>
+        prev.map((c) =>
+          c.id === data.chatId
+            ? {
+                ...c,
+                documents: [...(c.documents ?? []), { id: data.documentId, filename: data.filename, isYoutube, isWebsite }],
+              }
+            : c
+        )
+      );
     }
 
     appendMessage({
       role: "assistant",
-      text: messages.length === 0
-        ? isYoutube ? `🎬 I've loaded the transcript for **${data.filename}**. Ask me anything about it!`
-          : isWebsite ? `🌐 I've crawled **${data.pagesScraped} pages** from **${data.filename}**. Ask me anything about the site!`
-          : `📄 I've loaded **${data.filename}**. Ask me anything about it!`
-        : isYoutube ? `🎬 Also loaded **${data.filename}**. Feel free to ask about any of your sources!`
-          : isWebsite ? `🌐 Also crawled **${data.pagesScraped} pages** from **${data.filename}**!`
-          : `📄 Also loaded **${data.filename}**. Feel free to ask about any of your sources!`,
+      text:
+        messages.length === 0
+          ? isYoutube
+            ? `🎬 I've loaded the transcript for **${data.filename}**. Ask me anything about it!`
+            : isWebsite
+              ? `🌐 I've crawled **${data.pagesScraped} pages** from **${data.filename}**. Ask me anything about the site!`
+              : `📄 I've loaded **${data.filename}**. Ask me anything about it!`
+          : isYoutube
+            ? `🎬 Also loaded **${data.filename}**. Feel free to ask about any of your sources!`
+            : isWebsite
+              ? `🌐 Also crawled **${data.pagesScraped} pages** from **${data.filename}**!`
+              : `📄 Also loaded **${data.filename}**. Feel free to ask about any of your sources!`,
       id: Date.now(),
     });
   };
 
-  // ── Load chat from URL param ───────────────────────────────────────────
+  // from latest-news
+  const newsCrawlUrl = location.state?.crawlUrl || null;
+  const newsCandidateLinks = Array.isArray(location.state?.candidateLinks)
+    ? location.state.candidateLinks.filter(Boolean)
+    : [];
+
+  useEffect(() => {
+    if (newsCrawlUrl || newsCandidateLinks.length) {
+      window.history.replaceState({}, "");
+    }
+  }, [newsCrawlUrl, newsCandidateLinks.length]);
+
   useEffect(() => {
     if (!urlChatId) {
       setPdf(null);
@@ -129,10 +154,15 @@ export default function Chat() {
     const found = chatHistory.find((c) => c.id === urlChatId);
     if (found) {
       setPdf({ name: found.title });
-      resetPdfs((found.documents ?? []).map((d) => ({
-        id: d.id, name: d.filename, uploading: false,
-        isYoutube: d.isYoutube ?? false, isWebsite: d.isWebsite ?? false,
-      })));
+      resetPdfs(
+        (found.documents ?? []).map((d) => ({
+          id: d.id,
+          name: d.filename,
+          uploading: false,
+          isYoutube: d.isYoutube ?? false,
+          isWebsite: d.isWebsite ?? false,
+        }))
+      );
     }
 
     api.get(`/api/chat/${urlChatId}/messages`)
@@ -153,7 +183,6 @@ export default function Chat() {
       });
   }, [urlChatId, chatHistory, historyLoading]);
 
-  // ── New chat — always works regardless of what's loading ──────────────
   const startNewChat = () => {
     setPdf(null);
     resetPdfs([]);
@@ -169,7 +198,7 @@ export default function Chat() {
     setShowYoutubeInput(false);
     setShowWebsiteInput(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
-    setUploadGateKey((k) => k + 1); // force-remount UploadGate
+    setUploadGateKey((k) => k + 1);
     navigate("/chat", { replace: true });
   };
 
@@ -182,7 +211,6 @@ export default function Chat() {
 
   return (
     <div className="flex h-screen bg-zinc-950 text-white overflow-hidden">
-
       <input
         ref={fileInputRef}
         type="file"
@@ -221,8 +249,15 @@ export default function Chat() {
               uploading={uploading}
               dragOver={dragOver}
               uploadError={uploadError}
-              onDrop={(e) => { e.preventDefault(); setDragOver(false); handlePdfSelect(e.dataTransfer.files[0]); }}
-              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragOver(false);
+                handlePdfSelect(e.dataTransfer.files[0]);
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragOver(true);
+              }}
               onDragLeave={() => setDragOver(false)}
               onClick={() => !uploading && fileInputRef.current?.click()}
               youtubeUrl={youtubeUrl}
@@ -236,6 +271,8 @@ export default function Chat() {
               websiteLoading={websiteLoading}
               websiteError={websiteError}
               websiteProgress={websiteProgress}
+              autoWebsiteUrl={newsCrawlUrl}
+              autoWebsiteUrls={newsCandidateLinks}
             />
           ) : (
             <MessageList messages={messages} isTyping={isTyping} user={user} />
@@ -261,7 +298,17 @@ export default function Chat() {
         />
       </div>
 
-      {/* YouTube modal */}
+      <button
+        onClick={() => navigate("/latest-news")}
+        className="fixed top-16 right-4 z-50 flex items-center gap-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 hover:border-amber-500/50 text-amber-400 hover:text-amber-300 text-xs font-medium px-3.5 py-2 rounded-full shadow-lg transition-all duration-200 cursor-pointer"
+      >
+        <NewspaperIcon className="w-3.5 h-3.5 shrink-0" />
+        Latest News
+        <span className="bg-amber-500/15 text-amber-300 border border-amber-500/30 text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full">
+          Beta
+        </span>
+      </button>
+
       {showYoutubeInput && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="bg-zinc-900 border border-zinc-700 rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl">
@@ -275,7 +322,10 @@ export default function Chat() {
                 value={youtubeUrl}
                 onChange={(e) => setYoutubeUrl(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && !youtubeLoading) { handleYoutubeSubmit(); setShowYoutubeInput(false); }
+                  if (e.key === "Enter" && !youtubeLoading) {
+                    handleYoutubeSubmit();
+                    setShowYoutubeInput(false);
+                  }
                   if (e.key === "Escape") setShowYoutubeInput(false);
                 }}
                 placeholder="https://www.youtube.com/watch?v=..."
@@ -283,7 +333,10 @@ export default function Chat() {
                 className="flex-1 bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-red-500/70 transition"
               />
               <button
-                onClick={() => { handleYoutubeSubmit(); setShowYoutubeInput(false); }}
+                onClick={() => {
+                  handleYoutubeSubmit();
+                  setShowYoutubeInput(false);
+                }}
                 disabled={youtubeLoading || !youtubeUrl.trim()}
                 className="px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 disabled:bg-zinc-700 disabled:text-zinc-500 text-white text-sm font-medium transition cursor-pointer"
               >
@@ -291,14 +344,16 @@ export default function Chat() {
               </button>
             </div>
             {youtubeError && <p className="text-xs text-red-400 mt-2">{youtubeError}</p>}
-            <button onClick={() => setShowYoutubeInput(false)} className="mt-3 text-xs text-zinc-600 hover:text-zinc-400 transition cursor-pointer">
+            <button
+              onClick={() => setShowYoutubeInput(false)}
+              className="mt-3 text-xs text-zinc-600 hover:text-zinc-400 transition cursor-pointer"
+            >
               Cancel
             </button>
           </div>
         </div>
       )}
 
-      {/* Website modal */}
       {showWebsiteInput && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="bg-zinc-900 border border-zinc-700 rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl">
@@ -313,7 +368,10 @@ export default function Chat() {
                 value={websiteUrl}
                 onChange={(e) => setWebsiteUrl(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && !websiteLoading) { handleWebsiteSubmit(); setShowWebsiteInput(false); }
+                  if (e.key === "Enter" && !websiteLoading) {
+                    handleWebsiteSubmit();
+                    setShowWebsiteInput(false);
+                  }
                   if (e.key === "Escape") setShowWebsiteInput(false);
                 }}
                 placeholder="https://example.com/article"
@@ -321,7 +379,10 @@ export default function Chat() {
                 className="flex-1 bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500/70 transition"
               />
               <button
-                onClick={() => { handleWebsiteSubmit(); setShowWebsiteInput(false); }}
+                onClick={() => {
+                  handleWebsiteSubmit();
+                  setShowWebsiteInput(false);
+                }}
                 disabled={websiteLoading || !websiteUrl.trim()}
                 className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 disabled:text-zinc-500 text-white text-sm font-medium transition cursor-pointer"
               >
@@ -329,7 +390,10 @@ export default function Chat() {
               </button>
             </div>
             {websiteError && <p className="text-xs text-red-400 mt-2">{websiteError}</p>}
-            <button onClick={() => setShowWebsiteInput(false)} className="mt-3 text-xs text-zinc-600 hover:text-zinc-400 transition cursor-pointer">
+            <button
+              onClick={() => setShowWebsiteInput(false)}
+              className="mt-3 text-xs text-zinc-600 hover:text-zinc-400 transition cursor-pointer"
+            >
               Cancel
             </button>
           </div>

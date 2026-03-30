@@ -1,11 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   DocumentTextIcon,
   ChatBubbleLeftRightIcon,
   GlobeAltIcon,
-  NewspaperIcon,
 } from "@heroicons/react/24/outline";
-import LatestNews from "./LatestNews";
 
 function YouTubeIcon({ className }) {
   return (
@@ -34,34 +32,108 @@ export default function UploadGate({
   websiteLoading,
   websiteError,
   websiteProgress,
+  autoWebsiteUrl,
+  autoWebsiteUrls = [],
 }) {
-  const [mode, setMode] = useState(null);
-  const [pendingUrl, setPendingUrl] = useState(null);
+  const initialAutoLinks = Array.isArray(autoWebsiteUrls) && autoWebsiteUrls.length
+    ? autoWebsiteUrls.filter(Boolean)
+    : (autoWebsiteUrl ? [autoWebsiteUrl] : []);
 
-  // Called from LatestNews → switch to website mode and auto-crawl the article
-  const handleChatWithUrl = (url) => {
-    setWebsiteUrl(url);
-    setPendingUrl(url);
-    setMode("website");
-  };
+  const [mode, setMode] = useState(initialAutoLinks.length ? "website" : null);
+  const [retryLinks, setRetryLinks] = useState(initialAutoLinks);
+  const [currentRetryIndex, setCurrentRetryIndex] = useState(0);
+  const [pendingUrl, setPendingUrl] = useState(initialAutoLinks[0] || null);
+  const [retryDone, setRetryDone] = useState(false);
 
-  // Once parent websiteUrl syncs, fire the submit
-  useEffect(() => {
-    if (mode === "website" && pendingUrl && websiteUrl === pendingUrl) {
-      const t = setTimeout(() => {
-        onWebsiteSubmit();
-        setPendingUrl(null);
-      }, 150);
-      return () => clearTimeout(t);
-    }
-  }, [mode, pendingUrl, websiteUrl]);
+  const startedRef = useRef(false);
+  const finishedRef = useRef(false);
+
+  const isAutoRetryFlow = retryLinks.length > 0 && !retryDone;
 
   const goHome = () => {
     setPendingUrl(null);
     setMode(null);
+    setRetryDone(true);
+    setRetryLinks([]);
+    setCurrentRetryIndex(0);
+    startedRef.current = false;
+    finishedRef.current = false;
   };
 
-  // ── Home ─────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!initialAutoLinks.length) return;
+    const first = initialAutoLinks[0];
+    setRetryLinks(initialAutoLinks);
+    setCurrentRetryIndex(0);
+    setPendingUrl(first);
+    setMode("website");
+    setRetryDone(false);
+    setWebsiteUrl(first);
+    startedRef.current = false;
+    finishedRef.current = false;
+  }, [autoWebsiteUrl, JSON.stringify(autoWebsiteUrls), setWebsiteUrl]);
+
+  // start first/next attempt
+  useEffect(() => {
+    if (mode !== "website") return;
+    if (!pendingUrl) return;
+    if (websiteLoading) return;
+    if (startedRef.current) return;
+
+    const t = setTimeout(() => {
+      setWebsiteUrl(pendingUrl);
+      startedRef.current = true;
+      finishedRef.current = false;
+      onWebsiteSubmit();
+    }, 150);
+
+    return () => clearTimeout(t);
+  }, [mode, pendingUrl, websiteLoading, onWebsiteSubmit, setWebsiteUrl]);
+
+
+  // when one attempt finishes with error, wait 500ms, then move to next link
+  useEffect(() => {
+    if (!isAutoRetryFlow) return;
+    if (!startedRef.current) return;
+    if (websiteLoading) return;
+    if (finishedRef.current) return;
+
+    finishedRef.current = true;
+
+    if (!websiteError) {
+      setRetryDone(true);
+      setPendingUrl(null);
+      return;
+    }
+
+    const nextIndex = currentRetryIndex + 1;
+
+    if (nextIndex >= retryLinks.length || nextIndex >= 5) {
+      setRetryDone(true);
+      setPendingUrl(null);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      const nextUrl = retryLinks[nextIndex];
+      setCurrentRetryIndex(nextIndex);
+      setPendingUrl(nextUrl);
+      setWebsiteUrl(nextUrl);
+
+      startedRef.current = false;
+      finishedRef.current = false;
+    }, 3000);
+
+    return () => clearTimeout(timer);
+  }, [
+    websiteLoading,
+    websiteError,
+    currentRetryIndex,
+    retryLinks,
+    isAutoRetryFlow,
+    setWebsiteUrl,
+  ]);
+
   if (!mode) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-6">
@@ -71,7 +143,6 @@ export default function UploadGate({
         </div>
 
         <div className="flex gap-4 flex-wrap justify-center">
-          {/* PDF */}
           <button
             onClick={() => setMode("pdf")}
             className="group flex flex-col items-center gap-4 w-44 border-2 border-dashed border-zinc-700 hover:border-indigo-500 hover:bg-indigo-500/5 rounded-2xl p-7 transition-all cursor-pointer"
@@ -85,7 +156,6 @@ export default function UploadGate({
             </div>
           </button>
 
-          {/* YouTube */}
           <button
             onClick={() => setMode("youtube")}
             className="group flex flex-col items-center gap-4 w-44 border-2 border-dashed border-zinc-700 hover:border-red-500 hover:bg-red-500/5 rounded-2xl p-7 transition-all cursor-pointer"
@@ -99,7 +169,6 @@ export default function UploadGate({
             </div>
           </button>
 
-          {/* Website */}
           <button
             onClick={() => setMode("website")}
             className="group flex flex-col items-center gap-4 w-44 border-2 border-dashed border-zinc-700 hover:border-emerald-500 hover:bg-emerald-500/5 rounded-2xl p-7 transition-all cursor-pointer"
@@ -112,23 +181,6 @@ export default function UploadGate({
               <p className="text-zinc-500 text-xs mt-1">Crawl up to 10 pages</p>
             </div>
           </button>
-
-          {/* Latest News */}
-          <button
-            onClick={() => setMode("news")}
-            className="group relative flex flex-col items-center gap-4 w-44 border-2 border-dashed border-zinc-700 hover:border-amber-500 hover:bg-amber-500/5 rounded-2xl p-7 transition-all cursor-pointer"
-          >
-            <span className="absolute top-3 right-3 text-[10px] font-semibold uppercase tracking-wide bg-amber-500/15 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full">
-              Beta
-            </span>
-            <div className="w-12 h-12 rounded-2xl bg-zinc-800 group-hover:bg-amber-500/10 flex items-center justify-center transition">
-              <NewspaperIcon className="w-6 h-6 text-amber-400" />
-            </div>
-            <div className="text-center">
-              <p className="text-white font-medium text-sm">Latest News</p>
-              <p className="text-zinc-500 text-xs mt-1">Search & chat with articles</p>
-            </div>
-          </button>
         </div>
 
         <div className="flex items-center gap-2 text-zinc-600 text-sm mt-4">
@@ -139,7 +191,6 @@ export default function UploadGate({
     );
   }
 
-  // ── PDF ──────────────────────────────────────────────────────────────
   if (mode === "pdf") {
     return (
       <div className="h-full flex flex-col items-center justify-center">
@@ -151,8 +202,10 @@ export default function UploadGate({
           onDragOver={onDragOver}
           onDragLeave={onDragLeave}
           onClick={onClick}
-          className={`cursor-pointer w-full max-w-lg border-2 border-dashed rounded-2xl p-14 flex flex-col items-center gap-5 transition-all duration-200 ${uploading ? "border-indigo-500 bg-indigo-500/5 cursor-wait"
-              : dragOver ? "border-indigo-500 bg-indigo-500/10"
+          className={`cursor-pointer w-full max-w-lg border-2 border-dashed rounded-2xl p-14 flex flex-col items-center gap-5 transition-all duration-200 ${uploading
+              ? "border-indigo-500 bg-indigo-500/5 cursor-wait"
+              : dragOver
+                ? "border-indigo-500 bg-indigo-500/10"
                 : "border-zinc-700 hover:border-zinc-500 hover:bg-zinc-900"
             }`}
         >
@@ -178,7 +231,6 @@ export default function UploadGate({
     );
   }
 
-  // ── YouTube ──────────────────────────────────────────────────────────
   if (mode === "youtube") {
     return (
       <div className="h-full flex flex-col items-center justify-center">
@@ -228,20 +280,22 @@ export default function UploadGate({
     );
   }
 
-  // ── Website ──────────────────────────────────────────────────────────
   if (mode === "website") {
+    const showRetryMeta = isAutoRetryFlow && pendingUrl;
+
     return (
       <div className="h-full flex flex-col items-center justify-center">
-        {/* Back always visible — critical so user is never trapped */}
         <button onClick={goHome} className="mb-6 text-xs text-zinc-500 hover:text-zinc-300 transition cursor-pointer">
           ← Back
         </button>
+
         <div className="w-full max-w-lg flex flex-col items-center gap-6">
           <div className="w-16 h-16 rounded-2xl bg-zinc-800 flex items-center justify-center">
             {websiteLoading
               ? <span className="w-7 h-7 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
               : <GlobeAltIcon className="w-8 h-8 text-emerald-400" />}
           </div>
+
           <div className="text-center">
             <p className="text-white font-semibold text-base">
               {websiteLoading ? websiteProgress || "Crawling page…" : "Paste a Website URL"}
@@ -253,11 +307,25 @@ export default function UploadGate({
             </p>
           </div>
 
-          {/* Show URL being auto-loaded from news article */}
-          {pendingUrl ? (
-            <p className="text-xs text-zinc-500 text-center max-w-sm truncate">
-              Loading: <span className="text-zinc-300">{pendingUrl}</span>
-            </p>
+          {showRetryMeta ? (
+            <div className="w-full text-center space-y-2">
+              <p className="text-xs text-zinc-500">
+                Trying link {currentRetryIndex + 1} of {Math.min(retryLinks.length, 5)}
+              </p>
+              <p className="text-xs text-zinc-500 max-w-sm mx-auto truncate">
+                Loading: <span className="text-zinc-300">{pendingUrl}</span>
+              </p>
+              {!websiteLoading && websiteError && currentRetryIndex < Math.min(retryLinks.length, 5) - 1 && (
+                <p className="text-xs text-amber-400">
+                  This one failed. Trying next link…
+                </p>
+              )}
+              {!websiteLoading && websiteError && currentRetryIndex >= Math.min(retryLinks.length, 5) - 1 && (
+                <p className="text-sm text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-4 py-2.5 w-full text-center">
+                  {websiteError}
+                </p>
+              )}
+            </div>
           ) : (
             <>
               <div className="w-full flex gap-2">
@@ -278,30 +346,22 @@ export default function UploadGate({
                   {websiteLoading ? "Crawling…" : "Crawl"}
                 </button>
               </div>
+
               {websiteError && (
                 <p className="text-sm text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-4 py-2.5 w-full text-center">
                   {websiteError}
                 </p>
               )}
+
               {!websiteLoading && (
                 <p className="text-xs text-zinc-500 text-center max-w-md">
-                  Works best with websites that don’t require login. Some sites that block bots may not work.
+                  Works best with websites that don't require login. Some sites that block bots may not work.
                 </p>
               )}
             </>
           )}
         </div>
       </div>
-    );
-  }
-
-  // ── News ─────────────────────────────────────────────────────────────
-  if (mode === "news") {
-    return (
-      <LatestNews
-        onClose={() => setMode(null)}
-        onChatWithUrl={handleChatWithUrl}
-      />
     );
   }
 
