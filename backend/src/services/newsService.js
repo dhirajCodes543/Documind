@@ -90,6 +90,13 @@ async function getLatestNewsByTopic(topic) {
     contentSnippet: item.contentSnippet || "",
   }));
 
+  const cutoffTime = Date.now() - 3 * 60 * 60 * 1000;
+
+  articles = articles.filter((article) => {
+    const publishedTime = new Date(article.pubDate).getTime();
+    return !Number.isNaN(publishedTime) && publishedTime <= cutoffTime;
+  });
+
   articles.sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
   articles = dedupeArticles(articles);
 

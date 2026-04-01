@@ -4,11 +4,11 @@ const TAVILY_BASE_URL = "https://api.tavily.com/search";
 
 function cleanArticleTitle(title) {
   return title
-    .replace(/\s*-\s*[^-]+$/g, "") // remove publisher suffix
+    .replace(/\s*-\s*[^-]+$/g, "")
     .trim();
 }
 
-async function resolveArticleLink(title) {
+async function resolveArticleLink(title, source) {
   if (!title || typeof title !== "string" || !title.trim()) {
     throw new Error("Article title is required");
   }
@@ -19,11 +19,14 @@ async function resolveArticleLink(title) {
   }
 
   const cleanedTitle = cleanArticleTitle(title);
+  const query = source && typeof source === "string" && source.trim()
+    ? `${cleanedTitle} ${source.trim()}`
+    : cleanedTitle;
 
   const response = await axios.post(
     TAVILY_BASE_URL,
     {
-      query: cleanedTitle,
+      query,
       topic: "news",
       search_depth: "basic",
       max_results: 5,
@@ -45,7 +48,6 @@ async function resolveArticleLink(title) {
     throw new Error("No article link found");
   }
 
-  // Extract all valid URLs into an array
   const links = results
     .filter((r) => r.url && typeof r.url === "string" && r.url.trim())
     .map((r) => r.url);
@@ -55,7 +57,7 @@ async function resolveArticleLink(title) {
   }
 
   return {
-    links: links  // Return array of links instead of single resolvedLink
+    links: links
   };
 }
 
