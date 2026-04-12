@@ -26,7 +26,7 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY}
       BATCH_SIZE: ${BATCH_SIZE}
       RAPIDAPI_KEY: ${RAPIDAPI_KEY}
-      RESEND_API_KEY: ${re_eJRTqkY5_9U5aiZ5GV8NzJTvFJninYnPH}
+      RESEND_API_KEY: ${RESEND_API_KEY}
       TAVILY_API_KEY: ${TAVILY_API_KEY}
     volumes:
       - ./uploads:/app/uploads
