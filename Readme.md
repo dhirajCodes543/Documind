@@ -6,17 +6,15 @@ Users can interact with **PDFs, websites, YouTube transcripts, and latest news a
 
 ---
 
-# Live Application
+## Live Application
 
-Frontend  
-https://1documind.netlify.app
+**Frontend:** https://1documind.netlify.app
 
-Backend API  
-https://api.mindchuk.co.in
+**Backend API:** https://api.mindchuk.co.in
 
 ---
 
-# Features
+## Features
 
 - Chat with uploaded **PDF documents**
 - Chat with **website content**
@@ -24,13 +22,38 @@ https://api.mindchuk.co.in
 - Fetch and chat with **latest news articles**
 - **Vector semantic search** using embeddings
 - **Persistent chat history**
-- **Secure authentication**
+- **Secure authentication** with refresh and access tokens
+- **Forgot password** with OTP verification via Resend
+- **OTP verification** using Resend email service
 
 ---
 
-# How It Works
+## Authentication & Security
 
-DocuMind uses a **Retrieval-Augmented Generation (RAG)** pipeline.
+### Token Management
+
+**Access Token**
+- Stored in **session memory** (NOT in cookie)
+- Short-lived token for API requests
+- Used in Authorization header
+
+**Refresh Token**
+- Stored in **HTTP-only cookie** (secure)
+- Long-lived token for obtaining new access tokens
+- Automatically sent with requests
+
+### Password Recovery
+
+- User requests password reset via email
+- OTP sent via **Resend** email service
+- User verifies OTP
+- User sets new password
+
+---
+
+## How It Works
+
+### RAG Pipeline
 
 ```
 User Query
@@ -46,35 +69,25 @@ LLM Response Generation
 
 Documents are chunked, embedded, stored in PostgreSQL, and retrieved using vector similarity search before generating answers.
 
----
-
-# Latest News Feature
-
-DocuMind can fetch and analyze current news articles.
-
-Workflow:
-
-1. **Google News RSS** is used to retrieve the latest article links quickly.
-2. RSS is used because it is **very fast and lightweight**.
-3. Some RSS article links cannot be reliably opened using standard scraping.
-4. **Tavily API** is used to extract clean article content.
+### Latest News Feature
 
 ```
 Google News RSS → fast article discovery
-Tavily API      → reliable article extraction
+Tavily API     → reliable article extraction
 ```
 
-The extracted article content is then used for chat.
+- **Google News RSS** is used to retrieve latest article links quickly (very fast and lightweight)
+- **Tavily API** extracts clean article content (some RSS links cannot be reliably opened using standard scraping)
+- Extracted content is then used for chat
 
-Required environment variable:
-
+**Required environment variable:**
 ```
 TAVILY_API_KEY
 ```
 
 ---
 
-# System Architecture
+## System Architecture
 
 ```
 User
@@ -92,12 +105,11 @@ PostgreSQL + pgvector
 
 ---
 
-# Deployment Architecture
+## Deployment Architecture
 
 Backend runs on **AWS EC2 using Docker Compose**.
 
 Server structure:
-
 ```
 EC2 SERVER
 │
@@ -115,7 +127,6 @@ EC2 SERVER
 ```
 
 Persistence:
-
 ```
 Database → Docker volume
 Uploads  → EC2 filesystem
@@ -123,7 +134,7 @@ Uploads  → EC2 filesystem
 
 ---
 
-# Tech Stack
+## Tech Stack
 
 ### Frontend
 - React
@@ -135,6 +146,7 @@ Uploads  → EC2 filesystem
 - Node.js
 - Express
 - Prisma
+- Port: 5000
 
 ### Database
 - PostgreSQL
@@ -154,10 +166,11 @@ Uploads  → EC2 filesystem
 ### External APIs
 - Google News RSS
 - Tavily API
+- Resend (for OTP email delivery)
 
 ---
 
-# CI/CD Pipeline
+## CI/CD Pipeline
 
 Backend deployments are automated using **GitHub Actions**.
 
@@ -179,7 +192,7 @@ This updates the backend without affecting stored data.
 
 ---
 
-# Security
+## Security
 
 The backend API is secured using **HTTPS with Let's Encrypt SSL certificates**.
 
@@ -191,13 +204,14 @@ Nginx also redirects HTTP traffic to HTTPS.
 
 ---
 
-# Project Summary
+## Project Summary
 
 DocuMind combines:
-
 - **RAG-based AI retrieval**
 - **vector similarity search**
 - **multi-source content analysis**
+- **secure token-based authentication** (refresh token in cookie, access token in session)
+- **password recovery with OTP verification** via Resend
 - **automated cloud deployment**
 
 to create a production-ready platform for interacting with documents and real-time web content.
