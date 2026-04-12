@@ -2,10 +2,20 @@ const jwt = require("jsonwebtoken");
 
 const authMiddleware = (req, res, next) => {
   try {
-    const token = req.cookies.token;
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader) {
+      return res
+        .status(401)
+        .json({ error: "Unauthorized: Authorization header missing" });
+    }
+
+    const token = authHeader.split(" ")[1];
 
     if (!token) {
-      return res.status(401).json({ error: "Unauthorized: No token provided" });
+      return res
+        .status(401)
+        .json({ error: "Unauthorized: Access token missing" });
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
@@ -15,7 +25,9 @@ const authMiddleware = (req, res, next) => {
 
     next();
   } catch (error) {
-    return res.status(401).json({ error: "Unauthorized: Invalid or expired token" });
+    return res
+      .status(401)
+      .json({ error: "Unauthorized: Invalid or expired access token" });
   }
 };
 

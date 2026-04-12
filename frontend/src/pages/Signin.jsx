@@ -1,128 +1,192 @@
 import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { EnvelopeIcon, LockClosedIcon, EyeIcon, EyeSlashIcon } from "@heroicons/react/24/outline";
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import {
+  EnvelopeIcon,
+  LockClosedIcon,
+  EyeIcon,
+  EyeSlashIcon,
+} from "@heroicons/react/24/outline";
 import { useAuth } from "../Authcontext";
-import api from "../Api";
+import {
+  AuthLayout,
+  FormField,
+  InputWithIcon,
+  ErrorBanner,
+  SubmitButton,
+  extractError,
+} from "../Components/Authui";
 
 export default function SignIn() {
-  const [showPassword, setShowPassword] = useState(false);
-  const [form, setForm] = useState({ email: "", password: "" });
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const location = useLocation();
   const navigate = useNavigate();
-  const { user, login } = useAuth();
+  const { signin, isAuthenticated } = useAuth();
+
+  const prefillEmail = location.state?.email || "";
+
+  const [form, setForm] = useState({
+    email: prefillEmail,
+    password: "",
+  });
+
+  const [errors, setErrors] = useState({});
+  const [apiError, setApiError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
-    if (user) navigate("/", { replace: true });
-  }, [user]);
+    if (isAuthenticated) {
+      navigate("/", { replace: true });
+    }
+  }, [isAuthenticated, navigate]);
+
+  const validate = () => {
+    const e = {};
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+      e.email = "Enter a valid email address";
+    }
+
+    if (!form.password) {
+      e.password = "Password is required";
+    }
+
+    return e;
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError("");
+    setApiError("");
+
+    const errs = validate();
+    if (Object.keys(errs).length) {
+      setErrors(errs);
+      return;
+    }
+
+    setErrors({});
     setLoading(true);
+
     try {
-      const { data } = await api.post("/api/auth/signin", form);
-      login({ userId: data.user.id, email: data.user.email });
+      await signin({
+        email: form.email,
+        password: form.password,
+      });
+
       navigate("/");
     } catch (err) {
-      setError(err.response?.data?.error || "Sign in failed");
+      const message = extractError(err);
+
+      if (message === "Please verify your email first") {
+        setApiError("Please verify your email first. Redirecting...");
+
+        setTimeout(() => {
+          navigate("/verify-email", {
+            state: {
+              email: form.email,
+            },
+          });
+        }, 2000);
+
+        return;
+      }
+
+      setApiError(message);
     } finally {
       setLoading(false);
     }
   };
 
+  const set = (field) => (e) => {
+    setForm((prev) => ({
+      ...prev,
+      [field]: e.target.value,
+    }));
+
+    setErrors((prev) => ({
+      ...prev,
+      [field]: "",
+    }));
+  };
+
   return (
-    <div className="min-h-screen bg-zinc-950 flex items-center justify-center px-4">
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-125 h-125 bg-indigo-600/10 rounded-full blur-3xl" />
-      </div>
-
-      <div className="relative w-full max-w-sm">
-        <div className="mb-10 text-center">
-          <div className="inline-flex items-center justify-center w-11 h-11 rounded-xl bg-indigo-600 mb-4">
-            <LockClosedIcon className="w-5 h-5 text-white" />
-          </div>
-          <h1 className="text-2xl font-semibold text-white tracking-tight">Welcome back</h1>
-          <p className="mt-1.5 text-sm text-zinc-500">Sign in to continue</p>
-        </div>
-
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 shadow-xl shadow-black/40">
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div>
-              <label className="block text-xs font-medium text-zinc-400 mb-1.5 tracking-wide uppercase">
-                Email
-              </label>
-              <div className="relative">
-                <EnvelopeIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-                <input
-                  type="email"
-                  required
-                  placeholder="you@example.com"
-                  value={form.email}
-                  onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  className="w-full bg-zinc-800 border border-zinc-700 text-white text-sm rounded-lg pl-9 pr-4 py-2.5 placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
-                />
-              </div>
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-xs font-medium text-zinc-400 tracking-wide uppercase">
-                  Password
-                </label>
-                <button
-                  type="button"
-                  className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
-                >
-                  Forgot password?
-                </button>
-              </div>
-              <div className="relative">
-                <LockClosedIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-                <input
-                  type={showPassword ? "text" : "password"}
-                  required
-                  placeholder="Your password"
-                  value={form.password}
-                  onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  className="w-full bg-zinc-800 border border-zinc-700 text-white text-sm rounded-lg pl-9 pr-10 py-2.5 placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition"
-                >
-                  {showPassword ? <EyeSlashIcon className="w-4 h-4" /> : <EyeIcon className="w-4 h-4" />}
-                </button>
-              </div>
-            </div>
-
-            {error && (
-              <p className="text-xs text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-3 py-2">
-                {error}
-              </p>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 disabled:opacity-60 text-white text-sm font-medium rounded-lg py-2.5 mt-1 transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-zinc-900 flex items-center justify-center gap-2"
-            >
-              {loading && (
-                <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-              )}
-              {loading ? "Signing in…" : "Sign in"}
-            </button>
-          </form>
-        </div>
-
-        <p className="mt-6 text-center text-sm text-zinc-500">
+    <AuthLayout
+      icon={LockClosedIcon}
+      title="Welcome back"
+      subtitle="Sign in to continue"
+      footer={
+        <>
           Don't have an account?{" "}
-          <Link to="/signup" className="text-indigo-400 hover:text-indigo-300 font-medium transition-colors">
+          <Link
+            to="/signup"
+            className="text-indigo-400 hover:text-indigo-300 font-medium transition-colors"
+          >
             Sign up
           </Link>
-        </p>
-      </div>
-    </div>
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <FormField label="Email" error={errors.email}>
+          <InputWithIcon
+            icon={EnvelopeIcon}
+            type="email"
+            placeholder="you@example.com"
+            value={form.email}
+            onChange={set("email")}
+            error={errors.email}
+            autoComplete="email"
+          />
+        </FormField>
+
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-xs font-medium text-zinc-400 tracking-wide uppercase">
+              Password
+            </span>
+
+            <Link
+              to="/forgot-password"
+              state={{ email: form.email }}
+              className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+            >
+              Forgot password?
+            </Link>
+          </div>
+
+          <InputWithIcon
+            icon={LockClosedIcon}
+            type={showPassword ? "text" : "password"}
+            placeholder="Your password"
+            value={form.password}
+            onChange={set("password")}
+            error={errors.password}
+            autoComplete="current-password"
+            rightElement={
+              <button
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)}
+                className="text-zinc-500 hover:text-zinc-300 transition"
+              >
+                {showPassword ? (
+                  <EyeSlashIcon className="w-4 h-4" />
+                ) : (
+                  <EyeIcon className="w-4 h-4" />
+                )}
+              </button>
+            }
+          />
+
+          {errors.password && (
+            <p className="mt-1.5 text-xs text-red-400">{errors.password}</p>
+          )}
+        </div>
+
+        <ErrorBanner message={apiError} />
+
+        <SubmitButton loading={loading} loadingText="Signing in…">
+          Sign in
+        </SubmitButton>
+      </form>
+    </AuthLayout>
   );
 }
