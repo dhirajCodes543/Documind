@@ -19,8 +19,25 @@ if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-app.use(cors({ origin: "https://1documind.netlify.app", credentials: true }));
+const allowedOrigins = [
+  "https://1documind.netlify.app",
+  "https://documindai.dev",
+  "https://www.documindai.dev"
+];
+
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  credentials: true
+})); 
+
 app.use(cookieParser());
+
 app.use(express.json());
 
 app.use("/api/auth", require("./routes/auth.js"));
