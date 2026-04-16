@@ -16,7 +16,7 @@ exports.signup = async ({ email, password }) => {
   if (!email || !password) {
     throw { status: 400, message: "Email and password are required" };
   }
-
+  console.log("Signup request received for email:", email);
   const existingUser = await prisma.user.findUnique({
     where: { email },
   });
@@ -36,7 +36,7 @@ exports.signup = async ({ email, password }) => {
 
   const otp = generateOTP();
   const expiresAt = new Date(Date.now() + OTP_EXPIRY_MS);
-
+  console.log(`Generated OTP for ${email}: ${otp} (expires at ${expiresAt.toISOString()})`);
   await prisma.emailVerificationToken.deleteMany({
     where: { userId: user.id },
   });

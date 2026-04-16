@@ -3,8 +3,10 @@ const { Resend } = require("resend");
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 exports.sendVerificationEmail = async (to, otp) => {
-  await resend.emails.send({
-    from: "DocuMind <onboarding@resend.dev>",
+  console.log(`Sending verification email to ${to} with OTP: ${otp}`);
+
+  const { data, error } = await resend.emails.send({
+    from: "DocuMind <no-reply@documindai.dev>",
     to,
     subject: "Verify your DocuMind account",
     html: `
@@ -14,11 +16,21 @@ exports.sendVerificationEmail = async (to, otp) => {
       <p>This OTP will expire in 10 minutes.</p>
     `,
   });
+
+  console.log("Resend response data:", data);
+  console.log("Resend response error:", error);
+
+  if (error) {
+    throw new Error(`Resend failed: ${JSON.stringify(error)}`);
+  }
+
+  return data;
 };
 
+
 exports.sendResetPasswordEmail = async (to, otp) => {
-  await resend.emails.send({
-    from: "DocuMind <onboarding@resend.dev>",
+  const { data, error } = await resend.emails.send({
+    from: "DocuMind <no-reply@documindai.dev>",
     to,
     subject: "Reset your DocuMind password",
     html: `
@@ -28,4 +40,13 @@ exports.sendResetPasswordEmail = async (to, otp) => {
       <p>This OTP will expire in 10 minutes.</p>
     `,
   });
+
+  console.log("Reset email response:", data);
+  console.log("Reset email error:", error);
+
+  if (error) {
+    throw new Error(`Reset email failed: ${JSON.stringify(error)}`);
+  }
+
+  return data;
 };

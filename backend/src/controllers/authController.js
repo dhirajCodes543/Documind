@@ -3,7 +3,7 @@ const authService = require("../services/authService");
 exports.signupController = async (req, res) => {
   try {
     const result = await authService.signup(req.body);
-
+    console.log("Signup result:", result);
     return res.status(201).json({
       message: "Signup successful. Please verify your email.",
       user: result.user,
