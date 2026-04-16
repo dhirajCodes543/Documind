@@ -8,7 +8,7 @@ Users can interact with **PDFs, websites, YouTube transcripts, and latest news a
 
 ## Live Application
 
-**Frontend:** https://1documind.netlify.app
+**Frontend:** https://documindai.dev
 
 **Backend API:** https://api.mindchuk.co.in
 
