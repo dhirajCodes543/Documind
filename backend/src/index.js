@@ -22,7 +22,8 @@ if (!fs.existsSync(uploadDir)) {
 const allowedOrigins = [
   "https://1documind.netlify.app",
   "https://documindai.dev",
-  "https://www.documindai.dev"
+  "https://www.documindai.dev",
+  "http://localhost:5173"
 ];
 
 app.use(cors({
