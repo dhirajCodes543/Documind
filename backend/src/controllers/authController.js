@@ -111,7 +111,7 @@ exports.forgotPasswordController = async (req, res) => {
     await authService.forgotPassword(req.body.email);
 
     return res.status(200).json({
-      message: "If the email exists, a reset OTP has been sent",
+      message: "If an account with this email exists, a reset link/OTP has been sent.",
     });
   } catch (err) {
     return res.status(err.status || 500).json({
